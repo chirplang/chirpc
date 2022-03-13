@@ -1,9 +1,9 @@
 use std::str::FromStr;
 use crate::ast::{Expr, Opcode};
 use crate::MainError;
-use lalrpop_util::ErrorRecovery;
+use lalrpop_util::{ErrorRecovery, ParseError};
 
-grammar<'err>(errors: &'err mut Vec<ErrorRecovery<usize, Token<'input>, &'static str>>);
+grammar<'err>(errors: &'err mut Vec<ErrorRecovery<usize, Token<'input>, MainError>>);
 
 extern {
     type Error = MainError;
@@ -36,5 +36,8 @@ Term: Box<Expr> = {
 };
 
 Num: i32 = {
-    r"[0-9]+" => i32::from_str(<>).unwrap()
+    r"[0-9]+" =>? i32::from_str(<>)
+        .map_err(|_| ParseError::User {
+            error: MainError::InputTooBig
+        })
 };

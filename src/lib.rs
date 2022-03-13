@@ -23,6 +23,12 @@ fn number_too_big() {
     let mut errors = vec![];
     let expr = main_parser::ExprParser::new().parse(&mut errors, "2147483648");
     assert!(expr.is_err());
+    assert_eq!(
+        expr.unwrap_err(),
+        lalrpop_util::ParseError::User {
+            error: MainError::InputTooBig
+        }
+    );
 }
 
 #[test]
@@ -31,19 +37,5 @@ fn parse() {
     let expr = main_parser::ExprParser::new()
         .parse(&mut errors, "3 * * 2 + 7")
         .unwrap();
-    println!("{:?}", expr);
-    println!("{:?}", errors);
+    assert_eq!(&format!("{:?}", expr), "(((3 * error) * 2) + 7)");
 }
-
-// #[test]
-// fn number_too_big() {
-//     let mut errors = vec![];
-//     let expr = main_parser::ExprParser::new().parse(errors, "2147483648");
-//     assert!(expr.is_err());
-//     assert_eq!(
-//         expr.unwrap_err(),
-//         lalrpop_util::ParseError::User {
-//             error: MainError::InputTooBig
-//         }
-//     );
-// }
