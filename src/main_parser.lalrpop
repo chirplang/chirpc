@@ -66,6 +66,12 @@ Num: Number = {
             error: MainError::InputTooBig
         })
         .map(|raw| Number::Float(raw)),
+    // Float with no dot but exponent
+    r"(\+|\-)?[0-9]+(e|E)[0-9]+" =>? f64::from_str(<>)
+        .map_err(|_| ParseError::User {
+            error: MainError::InputTooBig
+        })
+        .map(|raw| Number::Float(raw)),
 };
 
 FunctionCall: FunctionCall<'input> = {

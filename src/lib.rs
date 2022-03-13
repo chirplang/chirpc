@@ -73,9 +73,9 @@ mod test {
     #[test]
     fn float_exponent_without_dot() {
         let mut errors = vec![];
-        let expr = main_parser::ExprParser::new().parse(&mut errors, "-20.6e20");
+        let expr = main_parser::ExprParser::new().parse(&mut errors, "-2e5");
         assert!(expr.is_ok());
-        assert_eq!(&format!("{:?}", expr.unwrap()), "-2060000000000000000000");
+        assert_eq!(&format!("{:?}", expr.unwrap()), "-200000");
     }
 
     #[test]
