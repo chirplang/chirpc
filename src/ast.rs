@@ -7,6 +7,7 @@ pub enum Expr<'a> {
     Op(Box<Expr<'a>>, Opcode, Box<Expr<'a>>),
     FunctionCall(FunctionCall<'a>),
     If(Box<Expr<'a>>, ExprList<'a>),
+    IfElse(Box<Expr<'a>>, ExprList<'a>, ExprList<'a>),
     Ident(Ident<'a>),
     Error,
 }
@@ -56,6 +57,9 @@ impl Debug for Expr<'_> {
             Op(ref l, op, ref r) => write!(fmt, "({:?} {:?} {:?})", l, op, r),
             FunctionCall(f) => write!(fmt, "{:?}", f),
             If(cond, exprs) => write!(fmt, "if {:?} {:?}", cond, exprs),
+            IfElse(cond, if_exprs, else_exprs) => {
+                write!(fmt, "if {:?} {:?} else {:?}", cond, if_exprs, else_exprs)
+            }
             Ident(i) => write!(fmt, "{:?}", i),
             Error => write!(fmt, "error"),
         }

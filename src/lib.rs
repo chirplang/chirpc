@@ -123,4 +123,17 @@ mod test {
             "if something() { \ndo_other()\n }"
         );
     }
+
+    #[test]
+    fn simple_if_else_test() {
+        let mut e = vec![];
+        let expr = main_parser::ExprParser::new()
+            .parse(&mut e, "if something { do_if() } else { other() }");
+        println!("{:?}", expr);
+        assert!(expr.is_ok());
+        assert_eq!(
+            &format!("{:?}", expr.unwrap()),
+            "if something { \ndo_if()\n } else { \nother()\n }"
+        );
+    }
 }
