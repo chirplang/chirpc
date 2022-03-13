@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use crate::ast::{Expr, Number, FunctionCall, IdentList, Ident, Opcode};
+use crate::ast::{ExprList, Expr, Number, FunctionCall, ArgList, Ident, Opcode};
 use crate::MainError;
 use lalrpop_util::{ErrorRecovery, ParseError};
 
@@ -19,10 +19,15 @@ CommaSeparatedList<T>: Vec<T> = {
     }
 };
 
+pub ExprList: ExprList<'input> =
+    CommaSeparatedList<Expr> => ExprList(<>);
+
 pub Expr: Box<Expr<'input>> = {
     Expr ExprOp Factor => Box::new(Expr::Op(<>)),
     FunctionCall => Box::new(Expr::FunctionCall(<>)),
     Factor,
+    "if" <cond:Expr> "{" <block:ExprList> "}" => Box::new(Expr::If(cond, block)),
+    Ident => Box::new(Expr::Ident(<>)),
 };
 
 ExprOp: Opcode = {
@@ -81,14 +86,14 @@ Num: Number = {
 };
 
 FunctionCall: FunctionCall<'input> = {
-    <ident:Ident> "(" <args:IdentList> ")" => FunctionCall {
+    <ident:Ident> "(" <args:ArgList> ")" => FunctionCall {
         ident,
         args
     }
 }
 
-IdentList: IdentList<'input> =
-    CommaSeparatedList<Ident> => IdentList(<>);
+ArgList: ArgList<'input> =
+    CommaSeparatedList<Expr> => ArgList(<>);
 
 Ident: Ident<'input> =
     r"([a-zA-Z]|_)([a-zA-Z0-9]|_)*" => Ident(<>);

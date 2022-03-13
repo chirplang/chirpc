@@ -110,4 +110,17 @@ mod test {
         assert!(expr.is_ok());
         assert_eq!(&format!("{:?}", expr.unwrap()), "test_function()");
     }
+
+    #[test]
+    fn simple_if_test() {
+        let mut errors = vec![];
+        let expr =
+            main_parser::ExprParser::new().parse(&mut errors, "if something() { do_other() }");
+        println!("{:?}", expr);
+        assert!(expr.is_ok());
+        assert_eq!(
+            &format!("{:?}", expr.unwrap()),
+            "if something() { \ndo_other()\n }"
+        );
+    }
 }
