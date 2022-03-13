@@ -9,6 +9,16 @@ extern {
     type Error = MainError;
 }
 
+CommaSeparatedList<T>: Vec<T> = {
+    <mut v:(<T> ",")*> <e:T?> => match e {
+        None => v,
+        Some(e) => {
+            v.push(e);
+            v
+        }
+    }
+};
+
 pub Expr: Box<Expr> = {
     Expr ExprOp Factor => Box::new(Expr::Op(<>)),
     Factor,
@@ -36,7 +46,7 @@ Term: Box<Expr> = {
 };
 
 Num: i32 = {
-    r"[0-9]+" =>? i32::from_str(<>)
+    r"(\+|\-)?[0-9]+" =>? i32::from_str(<>)
         .map_err(|_| ParseError::User {
             error: MainError::InputTooBig
         })

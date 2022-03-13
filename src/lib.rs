@@ -39,3 +39,11 @@ fn parse() {
         .unwrap();
     assert_eq!(&format!("{:?}", expr), "(((3 * error) * 2) + 7)");
 }
+
+#[test]
+fn negative_int_literal() {
+    let mut errors = vec![];
+    let expr = main_parser::ExprParser::new().parse(&mut errors, "-200");
+    assert!(expr.is_ok());
+    assert_eq!(&format!("{:?}", expr.unwrap()), "-200");
+}
