@@ -25,6 +25,15 @@ mod test {
     }
 
     #[test]
+    fn parse_test_simple_addition() {
+        let mut errors = vec![];
+        let expr = main_parser::ExprParser::new()
+            .parse(&mut errors, "22 + 33 - -12")
+            .unwrap();
+        assert_eq!(&format!("{:?}", expr), "((22 + 33) - -12)");
+    }
+
+    #[test]
     fn number_too_big() {
         let mut errors = vec![];
         let expr = main_parser::ExprParser::new().parse(&mut errors, "9223372036854775808");
@@ -38,7 +47,7 @@ mod test {
     }
 
     #[test]
-    fn parse() {
+    fn error() {
         let mut errors = vec![];
         let expr = main_parser::ExprParser::new()
             .parse(&mut errors, "3 * * 2 + 7")
