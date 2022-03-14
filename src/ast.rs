@@ -8,6 +8,7 @@ pub enum Expr<'a> {
     FunctionCall(FunctionCall<'a>),
     If(Box<Expr<'a>>, ExprList<'a>),
     IfElse(Box<Expr<'a>>, ExprList<'a>, ExprList<'a>),
+    Assign(IdentList<'a>, Box<Expr<'a>>),
     Ident(Ident<'a>),
     Error,
 }
@@ -18,6 +19,8 @@ pub struct FunctionCall<'a> {
 }
 
 pub struct ArgList<'a>(pub Vec<Box<Expr<'a>>>);
+
+pub struct IdentList<'a>(pub Vec<Ident<'a>>);
 
 pub struct Ident<'a>(pub &'a str);
 
@@ -60,6 +63,7 @@ impl Debug for Expr<'_> {
             IfElse(cond, if_exprs, else_exprs) => {
                 write!(fmt, "if {:?} {:?} else {:?}", cond, if_exprs, else_exprs)
             }
+            Assign(l, r) => write!(fmt, "{:?} = {:?}", l, r),
             Ident(i) => write!(fmt, "{:?}", i),
             Error => write!(fmt, "error"),
         }
@@ -96,6 +100,24 @@ impl Debug for ArgList<'_> {
 
         comma_separated.push_str(&format!("{:?}", self.0[self.0.len() - 1]));
         write!(fmt, "({})", comma_separated)
+    }
+}
+
+impl Debug for IdentList<'_> {
+    fn fmt(&self, fmt: &mut Formatter) -> Result<(), Error> {
+        if self.0.is_empty() {
+            // This should never happen
+            return Err(Error);
+        }
+        let mut dot_separated = String::new();
+
+        for item in &self.0[0..self.0.len() - 1] {
+            dot_separated.push_str(&format!("{:?}", item));
+            dot_separated.push_str(".");
+        }
+
+        dot_separated.push_str(&format!("{:?}", self.0[self.0.len() - 1]));
+        write!(fmt, "{}", dot_separated)
     }
 }
 

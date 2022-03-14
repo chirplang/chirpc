@@ -136,4 +136,13 @@ mod test {
             "if something { \ndo_if()\n } else { \nother()\n }"
         );
     }
+
+    #[test]
+    fn assign() {
+        let mut e = vec![];
+        let expr = main_parser::ExprParser::new().parse(&mut e, "this = that");
+        println!("{:?}", expr);
+        assert!(expr.is_ok());
+        assert_eq!(&format!("{:?}", expr.unwrap()), "this = that");
+    }
 }

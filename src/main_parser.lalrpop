@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use crate::ast::{ExprList, Expr, Number, FunctionCall, ArgList, Ident, Opcode};
+use crate::ast::{ExprList, Expr, Number, FunctionCall, ArgList, IdentList, Ident, Opcode};
 use crate::MainError;
 use lalrpop_util::{ErrorRecovery, ParseError};
 
@@ -9,6 +9,7 @@ extern {
     type Error = MainError;
 }
 
+// NOTE: This has trailing comma
 CommaSeparatedList<T>: Vec<T> = {
     <mut v:(<T> ",")*> <e:T?> => match e {
         None => v,
@@ -23,12 +24,17 @@ pub ExprList: ExprList<'input> =
     CommaSeparatedList<Expr> => ExprList(<>);
 
 pub Expr: Box<Expr<'input>> = {
-    Expr ExprOp Factor => Box::new(Expr::Op(<>)),
+    <l:IdentList> "=" <r:RightAssign> => Box::new(Expr::Assign(l, r)),
+    <RightAssign>,
+};
+
+RightAssign: Box<Expr<'input>> = {
+    RightAssign ExprOp Factor => Box::new(Expr::Op(<>)),
     FunctionCall => Box::new(Expr::FunctionCall(<>)),
     Factor,
-    "if" <cond:Expr> "{" <if_block:ExprList> "}" "else" "{" <else_block:ExprList> "}"
+    "if" <cond:RightAssign> "{" <if_block:ExprList> "}" "else" "{" <else_block:ExprList> "}"
         => Box::new(Expr::IfElse(cond, if_block, else_block)),
-    "if" <cond:Expr> "{" <block:ExprList> "}"
+    "if" <cond:RightAssign> "{" <block:ExprList> "}"
         => Box::new(Expr::If(cond, block)),
     Ident => Box::new(Expr::Ident(<>)),
 };
@@ -98,6 +104,13 @@ FunctionCall: FunctionCall<'input> = {
 
 ArgList: ArgList<'input> =
     CommaSeparatedList<Expr> => ArgList(<>);
+
+IdentList: IdentList<'input> = {
+    <a:Ident> <mut v:("." <Ident>)*> => {
+        v.push(a);
+        IdentList(v)
+    }
+};
 
 Ident: Ident<'input> =
     r"([a-zA-Z]|_)([a-zA-Z0-9]|_)*" => Ident(<>);
