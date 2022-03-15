@@ -1,14 +1,14 @@
 use std::fmt::{Debug, Error, Formatter};
 
-pub struct ExprList<'a>(pub Vec<Box<Expr<'a>>>);
+pub struct StatementList<'a>(pub Vec<Box<Statement<'a>>>);
 
-pub enum Expr<'a> {
+pub enum Statement<'a> {
     Number(Number),
-    Op(Box<Expr<'a>>, Opcode, Box<Expr<'a>>),
+    Op(Box<Statement<'a>>, Opcode, Box<Statement<'a>>),
     FunctionCall(FunctionCall<'a>),
-    If(Box<Expr<'a>>, ExprList<'a>),
-    IfElse(Box<Expr<'a>>, ExprList<'a>, ExprList<'a>),
-    Assign(IdentList<'a>, Box<Expr<'a>>),
+    If(Box<Statement<'a>>, StatementList<'a>),
+    IfElse(Box<Statement<'a>>, StatementList<'a>, StatementList<'a>),
+    Assign(IdentList<'a>, Box<Statement<'a>>),
     Ident(Ident<'a>),
     Error,
 }
@@ -18,7 +18,7 @@ pub struct FunctionCall<'a> {
     pub args: ArgList<'a>,
 }
 
-pub struct ArgList<'a>(pub Vec<Box<Expr<'a>>>);
+pub struct ArgList<'a>(pub Vec<Box<Statement<'a>>>);
 
 pub struct IdentList<'a>(pub Vec<Ident<'a>>);
 
@@ -34,9 +34,15 @@ pub enum Opcode {
     Div,
     Add,
     Sub,
+    Gt,
+    Ge,
+    Lt,
+    Le,
+    Eq,
+    Ne,
 }
 
-impl Debug for ExprList<'_> {
+impl Debug for StatementList<'_> {
     fn fmt(&self, fmt: &mut Formatter) -> Result<(), Error> {
         if self.0.is_empty() {
             return write!(fmt, "");
@@ -52,9 +58,9 @@ impl Debug for ExprList<'_> {
     }
 }
 
-impl Debug for Expr<'_> {
+impl Debug for Statement<'_> {
     fn fmt(&self, fmt: &mut Formatter) -> Result<(), Error> {
-        use self::Expr::*;
+        use self::Statement::*;
         match self {
             Number(n) => write!(fmt, "{:?}", n),
             Op(ref l, op, ref r) => write!(fmt, "({:?} {:?} {:?})", l, op, r),
@@ -135,6 +141,12 @@ impl Debug for Opcode {
             Div => write!(fmt, "/"),
             Add => write!(fmt, "+"),
             Sub => write!(fmt, "-"),
+            Gt => write!(fmt, ">"),
+            Ge => write!(fmt, ">="),
+            Lt => write!(fmt, "<"),
+            Le => write!(fmt, "<="),
+            Eq => write!(fmt, "=="),
+            Ne => write!(fmt, "!="),
         }
     }
 }

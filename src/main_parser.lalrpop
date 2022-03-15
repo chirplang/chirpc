@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use crate::ast::{ExprList, Expr, Number, FunctionCall, ArgList, IdentList, Ident, Opcode};
+use crate::ast::{StatementList, Statement, Number, FunctionCall, ArgList, IdentList, Ident, Opcode};
 use crate::MainError;
 use lalrpop_util::{ErrorRecovery, ParseError};
 
@@ -20,23 +20,38 @@ CommaSeparatedList<T>: Vec<T> = {
     }
 };
 
-pub ExprList: ExprList<'input> =
-    CommaSeparatedList<Expr> => ExprList(<>);
+pub StatementList: StatementList<'input> =
+    CommaSeparatedList<Statement> => StatementList(<>);
 
-pub Expr: Box<Expr<'input>> = {
-    <l:IdentList> "=" <r:RightAssign> => Box::new(Expr::Assign(l, r)),
-    <RightAssign>,
+pub Statement: Box<Statement<'input>> = {
+    <l:IdentList> "=" <r:Expr> => Box::new(Statement::Assign(l, r)),
+    <Comp>,
 };
 
-RightAssign: Box<Expr<'input>> = {
-    RightAssign ExprOp Factor => Box::new(Expr::Op(<>)),
-    FunctionCall => Box::new(Expr::FunctionCall(<>)),
+
+Comp: Box<Statement<'input>> = {
+    <Comp> <CompOp> <Expr> => Box::new(Statement::Op(<>)),
+    <Expr>,
+};
+
+CompOp: Opcode = {
+    ">" => Opcode::Gt,
+    ">=" => Opcode::Ge,
+    "<" => Opcode::Lt,
+    "<=" => Opcode::Le,
+    "==" => Opcode::Eq,
+    "!=" => Opcode::Ne,
+};
+
+Expr: Box<Statement<'input>> = {
+    Expr ExprOp Factor => Box::new(Statement::Op(<>)),
+    FunctionCall => Box::new(Statement::FunctionCall(<>)),
     Factor,
-    "if" <cond:RightAssign> "{" <if_block:ExprList> "}" "else" "{" <else_block:ExprList> "}"
-        => Box::new(Expr::IfElse(cond, if_block, else_block)),
-    "if" <cond:RightAssign> "{" <block:ExprList> "}"
-        => Box::new(Expr::If(cond, block)),
-    Ident => Box::new(Expr::Ident(<>)),
+    "if" <cond:Expr> "{" <if_block:StatementList> "}" "else" "{" <else_block:StatementList> "}"
+        => Box::new(Statement::IfElse(cond, if_block, else_block)),
+    "if" <cond:Expr> "{" <block:StatementList> "}"
+        => Box::new(Statement::If(cond, block)),
+    Ident => Box::new(Statement::Ident(<>)),
 };
 
 ExprOp: Opcode = {
@@ -44,8 +59,8 @@ ExprOp: Opcode = {
     "-" => Opcode::Sub,
 };
 
-Factor: Box<Expr<'input>> = {
-    Factor FactorOp Term => Box::new(Expr::Op(<>)),
+Factor: Box<Statement<'input>> = {
+    Factor FactorOp Term => Box::new(Statement::Op(<>)),
     Term,
 };
 
@@ -54,10 +69,10 @@ FactorOp: Opcode = {
     "/" => Opcode::Div,
 };
 
-Term: Box<Expr<'input>> = {
-    Num => Box::new(Expr::Number(<>)),
+Term: Box<Statement<'input>> = {
+    Num => Box::new(Statement::Number(<>)),
     "(" <Expr> ")",
-    ! => { errors.push(<>); Box::new(Expr::Error) },
+    ! => { errors.push(<>); Box::new(Statement::Error) },
 };
 
 // TODO: Implement underscores inbetween digits
@@ -103,7 +118,7 @@ FunctionCall: FunctionCall<'input> = {
 }
 
 ArgList: ArgList<'input> =
-    CommaSeparatedList<Expr> => ArgList(<>);
+    CommaSeparatedList<Statement> => ArgList(<>);
 
 IdentList: IdentList<'input> = {
     <a:Ident> <mut v:("." <Ident>)*> => {
