@@ -12,6 +12,7 @@ pub enum Statement<'a> {
     LetAssign(Ident<'a>, Box<Statement<'a>>),
     Assign(IdentList<'a>, Box<Statement<'a>>),
     Ident(Ident<'a>),
+    Block(StatementList<'a>),
     Error,
 }
 
@@ -25,6 +26,11 @@ pub struct ArgList<'a>(pub Vec<Box<Statement<'a>>>);
 pub struct IdentList<'a>(pub Vec<Ident<'a>>);
 
 pub struct Ident<'a>(pub &'a str);
+
+pub struct Type<'a> {
+    pub ident: Ident<'a>,
+    pub generics: Vec<Ident<'a>>
+}
 
 pub enum Number {
     Int(i64),
@@ -76,6 +82,7 @@ impl Debug for Statement<'_> {
             Assign(l, r) => write!(fmt, "{:?} = {:?}", l, r),
             Ident(i) => write!(fmt, "{:?}", i),
             Error => write!(fmt, "error"),
+            Block(list) => write!(fmt, "{:?}", list)
         }
     }
 }

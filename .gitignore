@@ -9,5 +9,7 @@
 #
 # already existing elements were commented out
 
+/.idea
+
 /target
 #Cargo.lock

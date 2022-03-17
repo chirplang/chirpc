@@ -8,10 +8,13 @@ pub enum MainError {
 
 lalrpop_mod!(pub main_parser);
 pub mod ast;
+mod wasm;
 
 #[cfg(test)]
 mod test {
     use std::vec;
+    use walrus::{FunctionBuilder, ValType};
+    use crate::wasm::{LocalMap, parse_statement};
 
     use super::*;
 
@@ -115,5 +118,26 @@ mod test {
         println!("{:?} with error vec {:?}", expr, e);
         assert!(expr.is_ok());
         assert_eq!(&format!("{:?}", expr.unwrap()), r);
+    }
+
+    #[test]
+    fn compile_wasm_test() {
+        let mut e = vec![];
+        let statement = main_parser::StatementParser::new().parse(
+            &mut e,
+            "123"
+        );
+
+        let mut module = walrus::Module::default();
+
+        let mut func = FunctionBuilder::new(&mut module.types, &[], &[ValType::I64]);
+
+        let mut locals = LocalMap {
+            names: Default::default()
+        };
+
+        parse_statement(&mut func.func_body(), &mut locals, &statement.unwrap());
+
+        dbg!(func.func_body().instrs().iter().map(|t| &t.0).collect::<Vec<_>>());
     }
 }

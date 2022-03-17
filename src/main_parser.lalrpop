@@ -65,6 +65,7 @@ Expr: Box<Statement<'input>> = {
     "if" <cond:Expr> "{" <block:StatementList> "}"
         => Box::new(Statement::If(cond, block)),
     Ident => Box::new(Statement::Ident(<>)),
+    "{" <l:StatementList> "}" => Box::new(Statement::Block(l))
 };
 
 ExprOp: Opcode = {
