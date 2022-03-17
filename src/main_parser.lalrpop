@@ -20,11 +20,24 @@ CommaSeparatedList<T>: Vec<T> = {
     }
 };
 
+// NOTE: This has a trailing comma
+SemiColonSeparatedList<T>: Vec<T> = {
+    <mut v:(<T> ";")*> <e:T?> => match e {
+        None => v,
+        Some(e) => {
+            v.push(e);
+            v
+        }
+    }
+};
+
 pub StatementList: StatementList<'input> =
-    CommaSeparatedList<Statement> => StatementList(<>);
+    SemiColonSeparatedList<Statement> => StatementList(<>);
 
 pub Statement: Box<Statement<'input>> = {
-    <l:IdentList> "=" <r:Expr> => Box::new(Statement::Assign(l, r)),
+    <IdentList> "=" <Expr> => Box::new(Statement::Assign(<>)),
+    "let" <Ident> => Box::new(Statement::Let(<>)),
+    "let" <Ident> "=" <Expr> => Box::new(Statement::LetAssign(<>)),
     <Comp>,
 };
 

@@ -17,20 +17,12 @@ mod test {
 
     #[test]
     fn parse_test() {
-        let mut errors = vec![];
-        let expr = main_parser::StatementParser::new()
-            .parse(&mut errors, "22 * 44 + 66")
-            .unwrap();
-        assert_eq!(&format!("{:?}", expr), "((22 * 44) + 66)");
+        parse_statement_expect("22 * 44 + 66", "((22 * 44) + 66)");
     }
 
     #[test]
     fn parse_test_simple_addition() {
-        let mut errors = vec![];
-        let expr = main_parser::StatementParser::new()
-            .parse(&mut errors, "22 + 33 - -12")
-            .unwrap();
-        assert_eq!(&format!("{:?}", expr), "((22 + 33) - -12)");
+        parse_statement_expect("22 + 33 - -12", "((22 + 33) - -12)");
     }
 
     #[test]
@@ -48,112 +40,80 @@ mod test {
 
     #[test]
     fn error() {
-        let mut errors = vec![];
-        let expr = main_parser::StatementParser::new()
-            .parse(&mut errors, "3 * * 2 + 7")
-            .unwrap();
-        assert_eq!(&format!("{:?}", expr), "(((3 * error) * 2) + 7)");
+        parse_statement_expect("3 * * 2 + 7", "(((3 * error) * 2) + 7)");
     }
 
     #[test]
     fn negative_int_literal() {
-        let mut errors = vec![];
-        let expr = main_parser::StatementParser::new().parse(&mut errors, "-200");
-        assert!(expr.is_ok());
-        assert_eq!(&format!("{:?}", expr.unwrap()), "-200");
+        parse_statement_expect_same("-200");
     }
 
     #[test]
     fn float() {
-        let mut errors = vec![];
-        let expr = main_parser::StatementParser::new().parse(&mut errors, "-13.37");
-        assert!(expr.is_ok());
-        assert_eq!(&format!("{:?}", expr.unwrap()), "-13.37")
+        parse_statement_expect_same("-13.37");
     }
 
     #[test]
     fn float_exponent() {
-        let mut errors = vec![];
-        let expr = main_parser::StatementParser::new().parse(&mut errors, "-20.6e20");
-        assert!(expr.is_ok());
-        assert_eq!(&format!("{:?}", expr.unwrap()), "-2060000000000000000000");
+        parse_statement_expect("-20.6e20", "-2060000000000000000000");
     }
 
     #[test]
     fn float_exponent_without_dot() {
-        let mut errors = vec![];
-        let expr = main_parser::StatementParser::new().parse(&mut errors, "-2e5");
-        assert!(expr.is_ok());
-        assert_eq!(&format!("{:?}", expr.unwrap()), "-200000");
+        parse_statement_expect("-2e5", "-200000");
     }
 
     #[test]
     fn hex_int() {
-        let mut errors = vec![];
-        let expr = main_parser::StatementParser::new().parse(&mut errors, "0x70Aa");
-        assert!(expr.is_ok());
-        assert_eq!(&format!("{:?}", expr.unwrap()), "28842");
+        parse_statement_expect("0x70Aa", "28842");
     }
 
     #[test]
     fn function_call() {
-        let mut errors = vec![];
-        let expr =
-            main_parser::StatementParser::new().parse(&mut errors, "test_function(one, two)");
-        assert!(expr.is_ok());
-        assert_eq!(&format!("{:?}", expr.unwrap()), "test_function(one, two)");
+        parse_statement_expect_same("test_function(one, two)");
     }
 
     #[test]
     fn function_call_no_args() {
-        let mut errors = vec![];
-        let expr = main_parser::StatementParser::new().parse(&mut errors, "test_function()");
-        assert!(expr.is_ok());
-        assert_eq!(&format!("{:?}", expr.unwrap()), "test_function()");
+        parse_statement_expect_same("test_function()");
     }
 
     #[test]
     fn simple_if_test() {
-        let mut errors = vec![];
-        let expr =
-            main_parser::StatementParser::new().parse(&mut errors, "if something() { do_other() }");
-        println!("{:?}", expr);
-        assert!(expr.is_ok());
-        assert_eq!(
-            &format!("{:?}", expr.unwrap()),
-            "if something() { \ndo_other()\n }"
-        );
+        parse_statement_expect_same("if something() { \ndo_other()\n }");
     }
 
     #[test]
     fn simple_if_else_test() {
-        let mut e = vec![];
-        let expr = main_parser::StatementParser::new()
-            .parse(&mut e, "if something { do_if() } else { other() }");
-        println!("{:?}", expr);
-        assert!(expr.is_ok());
-        assert_eq!(
-            &format!("{:?}", expr.unwrap()),
-            "if something { \ndo_if()\n } else { \nother()\n }"
-        );
+        parse_statement_expect_same("if something { \ndo_if()\n } else { \nother()\n }");
     }
 
     #[test]
     fn assign() {
-        let mut e = vec![];
-        let expr = main_parser::StatementParser::new().parse(&mut e, "this = that");
-        println!("{:?}", expr);
-        assert!(expr.is_ok());
-        assert_eq!(&format!("{:?}", expr.unwrap()), "this = that");
+        parse_statement_expect_same("this = that");
     }
 
     #[test]
     fn equals() {
+        parse_statement_expect("this == that", "(this == that)");
+    }
+
+    #[test]
+    fn let_assign() {
+        parse_statement_expect_same("let this = 3");
+    }
+
+    /// `parse_statement_expect(l, l);`
+    fn parse_statement_expect_same(l: &str) {
+        parse_statement_expect(l, l);
+    }
+
+    /// Convenience func, this parses l and makes sure it's string representation equals r
+    fn parse_statement_expect(l: &str, r: &str) {
         let mut e = vec![];
-        let expr = main_parser::StatementParser::new().parse(&mut e, "this == that");
-        println!("{:?}", expr);
-        println!("{:?}", e);
+        let expr = main_parser::StatementParser::new().parse(&mut e, l);
+        println!("{:?} with error vec {:?}", expr, e);
         assert!(expr.is_ok());
-        assert_eq!(&format!("{:?}", expr.unwrap()), "(this == that)");
+        assert_eq!(&format!("{:?}", expr.unwrap()), r);
     }
 }

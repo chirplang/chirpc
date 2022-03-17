@@ -8,6 +8,8 @@ pub enum Statement<'a> {
     FunctionCall(FunctionCall<'a>),
     If(Box<Statement<'a>>, StatementList<'a>),
     IfElse(Box<Statement<'a>>, StatementList<'a>, StatementList<'a>),
+    Let(Ident<'a>),
+    LetAssign(Ident<'a>, Box<Statement<'a>>),
     Assign(IdentList<'a>, Box<Statement<'a>>),
     Ident(Ident<'a>),
     Error,
@@ -69,6 +71,8 @@ impl Debug for Statement<'_> {
             IfElse(cond, if_exprs, else_exprs) => {
                 write!(fmt, "if {:?} {:?} else {:?}", cond, if_exprs, else_exprs)
             }
+            Let(i) => write!(fmt, "let {:?}", i),
+            LetAssign(i, a) => write!(fmt, "let {:?} = {:?}", i, a),
             Assign(l, r) => write!(fmt, "{:?} = {:?}", l, r),
             Ident(i) => write!(fmt, "{:?}", i),
             Error => write!(fmt, "error"),
