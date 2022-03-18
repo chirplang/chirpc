@@ -14,7 +14,7 @@ mod wasm;
 mod test {
     use std::vec;
     use walrus::{FunctionBuilder, ValType};
-    use crate::wasm::{LocalMap, parse_statement};
+    use crate::wasm::{LocalMap, compile_statement_wasm};
 
     use super::*;
 
@@ -121,23 +121,42 @@ mod test {
     }
 
     #[test]
-    fn compile_wasm_test() {
+    fn wasm_let_binding() {
         let mut e = vec![];
+
+        if !e.is_empty() {
+            panic!("{:?}", e);
+        }
+
         let statement = main_parser::StatementParser::new().parse(
             &mut e,
-            "123"
+            r#"
+            let d = {
+                let a = 123;
+                let b = a + 1;
+                let c = a;
+                a + 100;
+            }
+            "#
         );
 
         let mut module = walrus::Module::default();
 
+        let module_locals = &mut module.locals;
+
         let mut func = FunctionBuilder::new(&mut module.types, &[], &[ValType::I64]);
 
-        let mut locals = LocalMap {
+        let mut func_locals = LocalMap {
             names: Default::default()
         };
 
-        parse_statement(&mut func.func_body(), &mut locals, &statement.unwrap());
+        compile_statement_wasm(
+            &mut func.func_body(),
+            &mut func_locals,
+            module_locals,
+            &statement.unwrap()
+        );
 
-        dbg!(func.func_body().instrs().iter().map(|t| &t.0).collect::<Vec<_>>());
+        print!("{:?}", func.func_body().instrs().iter().map(|t| &t.0).collect::<Vec<_>>());
     }
 }
