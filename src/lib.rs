@@ -12,9 +12,12 @@ mod wasm;
 
 #[cfg(test)]
 mod test {
+    use std::collections::HashMap;
+    use std::rc::Rc;
     use std::vec;
+    use linked_hash_map::LinkedHashMap;
     use walrus::{FunctionBuilder, ValType};
-    use crate::wasm::{LocalMap, compile_statement_wasm};
+    use crate::wasm::{LocalMap, compile_statement_wasm, ChipType, Primitive};
 
     use super::*;
 
@@ -131,11 +134,8 @@ mod test {
         let statement = main_parser::StatementParser::new().parse(
             &mut e,
             r#"
-            let d = {
-                let a = 123;
-                let b = a + 1;
-                let c = a;
-                a + 100;
+            {   let a = test_struct;
+                a.field_1 = test_struct;
             }
             "#
         );
@@ -150,6 +150,25 @@ mod test {
             names: Default::default()
         };
 
+        let mut test_struct_def = LinkedHashMap::new();
+
+        (0..5).for_each(|index| {
+            test_struct_def.insert(format!("field_{}", index), ChipType::Primitive(Primitive::I64));
+
+            let test_field_local = module_locals.add(ValType::I64);
+
+            func_locals.names.insert(
+                format!("test_struct.field_{}", index),
+                (Some(test_field_local), ChipType::Primitive(Primitive::I64))
+            );
+
+        });
+
+        func_locals.names.insert(
+            "test_struct".into(),
+            (None, ChipType::Struct(Rc::new(test_struct_def)))
+        );
+
         compile_statement_wasm(
             &mut func.func_body(),
             &mut func_locals,
@@ -157,6 +176,6 @@ mod test {
             &statement.unwrap()
         );
 
-        print!("{:?}", func.func_body().instrs().iter().map(|t| &t.0).collect::<Vec<_>>());
+        dbg!("{:?}", func.func_body().instrs().iter().map(|t| &t.0).collect::<Vec<_>>());
     }
 }

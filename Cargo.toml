@@ -15,3 +15,4 @@ lalrpop-util = { version = "0.19.7", features = ["lexer"]}
 regex = "1"
 id-arena = "2.2.1"
 walrus = "0.19.0"
+linked-hash-map = "0.5.4"
