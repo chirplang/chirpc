@@ -1,5 +1,25 @@
 use std::fmt::{Debug, Error, Formatter};
 
+pub struct CompilationUnit<'a>(pub Vec<TopLevelDef<'a>>);
+
+pub enum TopLevelDef<'a> {
+    Func(FunctionDef<'a>),
+}
+
+pub struct FunctionDef<'a> {
+    pub ident: Ident<'a>,
+    pub args: ArgDefList<'a>,
+    pub return_type: Option<Ident<'a>>,
+    pub block: StatementList<'a>,
+}
+
+pub struct ArgDefList<'a>(pub Vec<ArgDef<'a>>);
+
+pub struct ArgDef<'a> {
+    pub name: Ident<'a>,
+    pub chip_type: Ident<'a>,
+}
+
 pub struct StatementList<'a>(pub Vec<Box<Statement<'a>>>);
 
 pub enum Statement<'a> {
@@ -27,9 +47,14 @@ pub struct IdentList<'a>(pub Vec<Ident<'a>>);
 
 pub struct Ident<'a>(pub &'a str);
 
+pub struct Struct<'a> {
+    pub ident: Ident<'a>,
+    pub generics: Vec<Ident<'a>>,
+}
+
 pub struct Type<'a> {
     pub ident: Ident<'a>,
-    pub generics: Vec<Ident<'a>>
+    pub generics: Vec<Ident<'a>>,
 }
 
 pub enum Number {
@@ -50,19 +75,71 @@ pub enum Opcode {
     Ne,
 }
 
+impl Debug for CompilationUnit<'_> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        let mut builder = String::new();
+        for item in &self.0 {
+            builder.push_str(&format!("{:?}", item));
+        }
+        return write!(f, "{}", builder);
+    }
+}
+
+impl Debug for TopLevelDef<'_> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        match self {
+            Self::Func(fun) => write!(f, "{:?}", fun),
+        }
+    }
+}
+
+impl Debug for FunctionDef<'_> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        if let Some(ret) = &self.return_type {
+            write!(
+                f,
+                "{:?}({:?}) -> {:?} {:?}",
+                self.ident, self.args, ret, self.block
+            )
+        } else {
+            write!(f, "{:?}({:?}) {:?}", self.ident, self.args, self.block)
+        }
+    }
+}
+
+impl Debug for ArgDefList<'_> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        if self.0.is_empty() {
+            return Ok(());
+        }
+        let mut builder = String::new();
+        for item in &self.0[0..self.0.len() - 1] {
+            builder.push_str(&format!("{:?}, ", item));
+        }
+        builder.push_str(&format!("{:?}", self.0[self.0.len() - 1]));
+        write!(f, "{}", builder)
+    }
+}
+
+impl Debug for ArgDef<'_> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        write!(f, "{:?}: {:?}", self.name, self.chip_type)
+    }
+}
+
 impl Debug for StatementList<'_> {
     fn fmt(&self, fmt: &mut Formatter) -> Result<(), Error> {
         if self.0.is_empty() {
-            return write!(fmt, "");
+            return Ok(());
         }
         let mut comma_separated = String::from('\n');
 
         for item in &self.0[0..self.0.len() - 1] {
-            comma_separated.push_str(&format!("{:?}\n", item));
+            comma_separated.push_str(&format!("{:?};\n", item));
         }
 
         comma_separated.push_str(&format!("{:?}", self.0[self.0.len() - 1]));
-        write!(fmt, "{{ {}\n }}", comma_separated)
+        write!(fmt, "{{ {};\n }}", comma_separated)
     }
 }
 
@@ -82,7 +159,7 @@ impl Debug for Statement<'_> {
             Assign(l, r) => write!(fmt, "{:?} = {:?}", l, r),
             Ident(i) => write!(fmt, "{:?}", i),
             Error => write!(fmt, "error"),
-            Block(list) => write!(fmt, "{:?}", list)
+            Block(list) => write!(fmt, "{:?}", list),
         }
     }
 }

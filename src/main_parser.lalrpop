@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use crate::ast::{StatementList, Statement, Number, FunctionCall, ArgList, IdentList, Ident, Opcode};
+use crate::ast::{CompilationUnit, TopLevelDef, FunctionDef, ArgDefList, ArgDef, StatementList, Statement, Number, FunctionCall, ArgList, IdentList, Ident, Opcode};
 use crate::MainError;
 use lalrpop_util::{ErrorRecovery, ParseError};
 
@@ -8,6 +8,25 @@ grammar<'err>(errors: &'err mut Vec<ErrorRecovery<usize, Token<'input>, MainErro
 extern {
     type Error = MainError;
 }
+
+pub CompilationUnit: CompilationUnit<'input> = <TopLevelDef*> => CompilationUnit(<>);
+
+TopLevelDef: TopLevelDef<'input> = {
+    <FunctionDef> => TopLevelDef::Func(<>)
+};
+
+FunctionDef: FunctionDef<'input> = {
+    <ident:Ident> "(" <args:ArgDefList> ")" "{" <block:StatementList> "}"
+        => FunctionDef { ident, args, return_type: None, block },
+    <ident:Ident> "(" <args:ArgDefList> ")" "->" <return_type:Ident> "{" <block:StatementList> "}"
+        => FunctionDef { ident, args, return_type: Some(return_type), block }
+};
+
+ArgDefList: ArgDefList<'input> =
+    CommaSeparatedList<ArgDef> => ArgDefList(<>);
+
+ArgDef: ArgDef<'input> =
+    <name:Ident> ":" <chip_type:Ident> => ArgDef { name, chip_type };
 
 // NOTE: This has trailing comma
 CommaSeparatedList<T>: Vec<T> = {
@@ -31,7 +50,7 @@ SemiColonSeparatedList<T>: Vec<T> = {
     }
 };
 
-pub StatementList: StatementList<'input> =
+StatementList: StatementList<'input> =
     SemiColonSeparatedList<Statement> => StatementList(<>);
 
 pub Statement: Box<Statement<'input>> = {
@@ -60,13 +79,16 @@ Expr: Box<Statement<'input>> = {
     Expr ExprOp Factor => Box::new(Statement::Op(<>)),
     FunctionCall => Box::new(Statement::FunctionCall(<>)),
     Factor,
-    "if" <cond:Expr> "{" <if_block:StatementList> "}" "else" "{" <else_block:StatementList> "}"
-        => Box::new(Statement::IfElse(cond, if_block, else_block)),
-    "if" <cond:Expr> "{" <block:StatementList> "}"
-        => Box::new(Statement::If(cond, block)),
+    "if" <Expr> "{" <StatementList> "}" "else" "{" <StatementList> "}"
+        => Box::new(Statement::IfElse(<>)),
+    "if" <Expr> "{" <StatementList> "}"
+        => Box::new(Statement::If(<>)),
     Ident => Box::new(Statement::Ident(<>)),
-    "{" <l:StatementList> "}" => Box::new(Statement::Block(l))
+    <Block>
 };
+
+Block: Box<Statement<'input>> =
+    "{" <StatementList> "}" => Box::new(Statement::Block(<>));
 
 ExprOp: Opcode = {
     "+" => Opcode::Add,

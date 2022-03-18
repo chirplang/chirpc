@@ -12,12 +12,12 @@ mod wasm;
 
 #[cfg(test)]
 mod test {
+    use crate::wasm::{compile_statement_wasm, ChipType, LocalMap, Primitive};
+    use linked_hash_map::LinkedHashMap;
     use std::collections::HashMap;
     use std::rc::Rc;
     use std::vec;
-    use linked_hash_map::LinkedHashMap;
     use walrus::{FunctionBuilder, ValType};
-    use crate::wasm::{LocalMap, compile_statement_wasm, ChipType, Primitive};
 
     use super::*;
 
@@ -29,6 +29,11 @@ mod test {
     #[test]
     fn parse_test_simple_addition() {
         parse_statement_expect("22 + 33 - -12", "((22 + 33) - -12)");
+    }
+
+    #[test]
+    fn parse_addition_idents() {
+        parse_statement_expect_same("a = (b + c)");
     }
 
     #[test]
@@ -86,12 +91,12 @@ mod test {
 
     #[test]
     fn simple_if_test() {
-        parse_statement_expect_same("if something() { \ndo_other()\n }");
+        parse_statement_expect_same("if something() { \ndo_other();\n }");
     }
 
     #[test]
     fn simple_if_else_test() {
-        parse_statement_expect_same("if something { \ndo_if()\n } else { \nother()\n }");
+        parse_statement_expect_same("if something { \ndo_if();\n } else { \nother();\n }");
     }
 
     #[test]
@@ -107,6 +112,19 @@ mod test {
     #[test]
     fn let_assign() {
         parse_statement_expect_same("let this = 3");
+    }
+
+    #[test]
+    fn parse_compilation_unit() {
+        let mut e = vec![];
+        let expr = main_parser::CompilationUnitParser::new()
+            .parse(&mut e, "view() -> Test { test_func(); a = b + 3 }");
+        println!("{:?} with error vec {:?}", expr, e);
+        assert!(expr.is_ok());
+        assert_eq!(
+            &format!("{:?}", expr.unwrap()),
+            "view() -> Test { \ntest_func();\na = (b + 3);\n }"
+        );
     }
 
     /// `parse_statement_expect(l, l);`
@@ -137,7 +155,7 @@ mod test {
             {   let a = test_struct;
                 a.field_1 = test_struct;
             }
-            "#
+            "#,
         );
 
         let mut module = walrus::Module::default();
@@ -147,35 +165,44 @@ mod test {
         let mut func = FunctionBuilder::new(&mut module.types, &[], &[ValType::I64]);
 
         let mut func_locals = LocalMap {
-            names: Default::default()
+            names: Default::default(),
         };
 
         let mut test_struct_def = LinkedHashMap::new();
 
         (0..5).for_each(|index| {
-            test_struct_def.insert(format!("field_{}", index), ChipType::Primitive(Primitive::I64));
+            test_struct_def.insert(
+                format!("field_{}", index),
+                ChipType::Primitive(Primitive::I64),
+            );
 
             let test_field_local = module_locals.add(ValType::I64);
 
             func_locals.names.insert(
                 format!("test_struct.field_{}", index),
-                (Some(test_field_local), ChipType::Primitive(Primitive::I64))
+                (Some(test_field_local), ChipType::Primitive(Primitive::I64)),
             );
-
         });
 
         func_locals.names.insert(
             "test_struct".into(),
-            (None, ChipType::Struct(Rc::new(test_struct_def)))
+            (None, ChipType::Struct(Rc::new(test_struct_def))),
         );
 
         compile_statement_wasm(
             &mut func.func_body(),
             &mut func_locals,
             module_locals,
-            &statement.unwrap()
+            &statement.unwrap(),
         );
 
-        dbg!("{:?}", func.func_body().instrs().iter().map(|t| &t.0).collect::<Vec<_>>());
+        dbg!(
+            "{:?}",
+            func.func_body()
+                .instrs()
+                .iter()
+                .map(|t| &t.0)
+                .collect::<Vec<_>>()
+        );
     }
 }
