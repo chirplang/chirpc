@@ -118,12 +118,12 @@ mod test {
     fn parse_compilation_unit() {
         let mut e = vec![];
         let expr = main_parser::CompilationUnitParser::new()
-            .parse(&mut e, "view() -> Test { test_func(); a = b + 3 }");
+            .parse(&mut e, "view() -> Test { test_func(); a = b + c }");
         println!("{:?} with error vec {:?}", expr, e);
         assert!(expr.is_ok());
         assert_eq!(
             &format!("{:?}", expr.unwrap()),
-            "view() -> Test { \ntest_func();\na = (b + 3);\n }"
+            "view() -> Test { \ntest_func();\na = (b + c);\n }"
         );
     }
 

@@ -77,13 +77,12 @@ CompOp: Opcode = {
 
 Expr: Box<Statement<'input>> = {
     Expr ExprOp Factor => Box::new(Statement::Op(<>)),
-    FunctionCall => Box::new(Statement::FunctionCall(<>)),
     Factor,
+    FunctionCall => Box::new(Statement::FunctionCall(<>)),
     "if" <Expr> "{" <StatementList> "}" "else" "{" <StatementList> "}"
         => Box::new(Statement::IfElse(<>)),
     "if" <Expr> "{" <StatementList> "}"
         => Box::new(Statement::If(<>)),
-    Ident => Box::new(Statement::Ident(<>)),
     <Block>
 };
 
@@ -106,6 +105,7 @@ FactorOp: Opcode = {
 };
 
 Term: Box<Statement<'input>> = {
+    Ident => Box::new(Statement::Ident(<>)),
     Num => Box::new(Statement::Number(<>)),
     "(" <Expr> ")",
     ! => { errors.push(<>); Box::new(Statement::Error) },
