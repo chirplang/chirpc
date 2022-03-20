@@ -31,6 +31,7 @@ pub enum Statement<'a> {
     Let(Ident<'a>),
     LetAssign(Ident<'a>, Box<Statement<'a>>),
     Assign(IdentList<'a>, Box<Statement<'a>>),
+    Tag(Tag<'a>),
     Ident(Ident<'a>),
     Block(StatementList<'a>),
     Error,
@@ -45,6 +46,17 @@ pub struct ArgList<'a>(pub Vec<Box<Statement<'a>>>);
 
 pub struct IdentList<'a>(pub Vec<Ident<'a>>);
 
+pub struct TagList<'a>(pub Vec<Tag<'a>>);
+
+pub struct Tag<'a> {
+    pub ident: Ident<'a>,
+    pub properties: PropertyList<'a>,
+    pub children: TagList<'a>,
+}
+
+pub struct PropertyList<'a>(pub Vec<(Ident<'a>, Ident<'a>)>);
+
+#[derive(PartialEq, Eq)]
 pub struct Ident<'a>(pub &'a str);
 
 pub struct Struct<'a> {
@@ -157,6 +169,7 @@ impl Debug for Statement<'_> {
             Let(i) => write!(fmt, "let {:?}", i),
             LetAssign(i, a) => write!(fmt, "let {:?} = {:?}", i, a),
             Assign(l, r) => write!(fmt, "{:?} = {:?}", l, r),
+            Tag(t) => write!(fmt, "{:?}", t),
             Ident(i) => write!(fmt, "{:?}", i),
             Error => write!(fmt, "error"),
             Block(list) => write!(fmt, "{:?}", list),
@@ -188,8 +201,7 @@ impl Debug for ArgList<'_> {
         let mut comma_separated = String::new();
 
         for item in &self.0[0..self.0.len() - 1] {
-            comma_separated.push_str(&format!("{:?}", item));
-            comma_separated.push_str(", ");
+            comma_separated.push_str(&format!("{:?}, ", item));
         }
 
         comma_separated.push_str(&format!("{:?}", self.0[self.0.len() - 1]));
@@ -206,12 +218,59 @@ impl Debug for IdentList<'_> {
         let mut dot_separated = String::new();
 
         for item in &self.0[0..self.0.len() - 1] {
-            dot_separated.push_str(&format!("{:?}", item));
-            dot_separated.push_str(".");
+            dot_separated.push_str(&format!("{:?}.", item));
         }
 
         dot_separated.push_str(&format!("{:?}", self.0[self.0.len() - 1]));
         write!(fmt, "{}", dot_separated)
+    }
+}
+
+impl Debug for TagList<'_> {
+    fn fmt(&self, fmt: &mut Formatter) -> Result<(), Error> {
+        if self.0.is_empty() {
+            return Err(Error);
+        }
+        let mut builder = String::from(" ");
+
+        for item in &self.0[0..self.0.len() - 1] {
+            builder.push_str(&format!("{:?} ", item));
+        }
+
+        let last = &self.0[self.0.len() - 1];
+        builder.push_str(&format!("{:?} ", last));
+        write!(fmt, "{}", builder)
+    }
+}
+
+impl Debug for Tag<'_> {
+    fn fmt(&self, fmt: &mut Formatter) -> Result<(), Error> {
+        if self.children.0.is_empty() {
+            write!(fmt, "<{:?}{:?}/>", self.ident, self.properties)
+        } else {
+            write!(
+                fmt,
+                "<{:?}{:?}>{:?}</{:?}>",
+                self.ident, self.properties, self.children, self.ident
+            )
+        }
+    }
+}
+
+impl Debug for PropertyList<'_> {
+    fn fmt(&self, fmt: &mut Formatter) -> Result<(), Error> {
+        if self.0.is_empty() {
+            return Ok(());
+        }
+        let mut builder = String::from(" ");
+
+        for item in &self.0[0..self.0.len() - 1] {
+            builder.push_str(&format!("{:?}={:?} ", item.0, item.1));
+        }
+
+        let last = &self.0[self.0.len() - 1];
+        builder.push_str(&format!("{:?}={:?}", last.0, last.1));
+        write!(fmt, "{}", builder)
     }
 }
 
