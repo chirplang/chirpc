@@ -4,6 +4,7 @@ pub struct CompilationUnit<'a>(pub Vec<TopLevelDef<'a>>);
 
 pub enum TopLevelDef<'a> {
     Func(FunctionDef<'a>),
+    Export(Ident<'a>, TagList<'a>),
 }
 
 pub struct FunctionDef<'a> {
@@ -99,8 +100,10 @@ impl Debug for CompilationUnit<'_> {
 
 impl Debug for TopLevelDef<'_> {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        use self::TopLevelDef::*;
         match self {
-            Self::Func(fun) => write!(f, "{:?}", fun),
+            Func(fun) => write!(f, "{:?}", fun),
+            Export(i, t) => write!(f, "export {:?} {{\n{:?}}}\n", i, t),
         }
     }
 }

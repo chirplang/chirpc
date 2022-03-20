@@ -12,7 +12,8 @@ extern {
 pub CompilationUnit: CompilationUnit<'input> = <TopLevelDef*> => CompilationUnit(<>);
 
 TopLevelDef: TopLevelDef<'input> = {
-    <FunctionDef> => TopLevelDef::Func(<>)
+    <FunctionDef> => TopLevelDef::Func(<>),
+    "export" <Ident> "{" <TagList> "}" => TopLevelDef::Export(<>),
 };
 
 FunctionDef: FunctionDef<'input> = {

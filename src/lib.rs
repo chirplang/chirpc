@@ -11,6 +11,7 @@ lalrpop_mod!(pub main_parser);
 pub mod ast;
 mod wasm;
 
+#[allow(dead_code)]
 #[cfg(test)]
 mod test {
     use crate::wasm::{compile_statement_wasm, ChipType, LocalMap, Primitive};
@@ -116,15 +117,13 @@ mod test {
     }
 
     #[test]
-    fn parse_compilation_unit() {
-        let mut e = vec![];
-        let expr = main_parser::CompilationUnitParser::new()
-            .parse(&mut e, "view() -> Test { test_func(); a = b + c }");
-        println!("{:?} with error vec {:?}", expr, e);
-        assert!(expr.is_ok());
-        assert_eq!(
-            &format!("{:?}", expr.unwrap()),
-            "view() -> Test { \ntest_func();\na = (b + c);\n }"
+    fn compilation_unit() {
+        parse_compilation_unit_expect(
+            "
+            export Test { <Tag/> }
+            view() -> Test { test_func(); a = b + c }
+            ",
+            "export Test {\n <Tag/> }\nview() -> Test { \ntest_func();\na = (b + c);\n }",
         );
     }
 
@@ -133,6 +132,20 @@ mod test {
         parse_statement_expect_same("<Tag/>");
         parse_statement_expect_same("<Tag disable=true/>");
         parse_statement_expect_same("<Tag disable=true> <OtherTag this=that/> </Tag>");
+    }
+
+    /// `parse_statement_expect(l, l);`
+    fn parse_compilation_unit_expect_same(l: &str) {
+        parse_compilation_unit_expect(l, l);
+    }
+
+    fn parse_compilation_unit_expect(l: &str, r: &str) {
+        println!("Testing that parsed {:?} == {:?}", l, r);
+        let mut e = vec![];
+        let expr = main_parser::CompilationUnitParser::new().parse(&mut e, l);
+        println!("{:?} with error vec {:?}", expr, e);
+        assert!(expr.is_ok());
+        assert_eq!(&format!("{:?}", expr.unwrap()), r);
     }
 
     /// `parse_statement_expect(l, l);`
