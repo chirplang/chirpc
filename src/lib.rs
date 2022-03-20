@@ -4,6 +4,7 @@ extern crate lalrpop_util;
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum MainError {
     InputTooBig,
+    TagOpenTypeIsntTagCloseType,
 }
 
 lalrpop_mod!(pub main_parser);
@@ -127,6 +128,13 @@ mod test {
         );
     }
 
+    #[test]
+    fn parse_tag_all_cases() {
+        parse_statement_expect_same("<Tag/>");
+        parse_statement_expect_same("<Tag disable=true/>");
+        parse_statement_expect_same("<Tag disable=true> <OtherTag this=that/> </Tag>");
+    }
+
     /// `parse_statement_expect(l, l);`
     fn parse_statement_expect_same(l: &str) {
         parse_statement_expect(l, l);
@@ -134,6 +142,7 @@ mod test {
 
     /// Convenience func, this parses l and makes sure it's string representation equals r
     fn parse_statement_expect(l: &str, r: &str) {
+        println!("Testing that parsed {:?} == {:?}", l, r);
         let mut e = vec![];
         let expr = main_parser::StatementParser::new().parse(&mut e, l);
         println!("{:?} with error vec {:?}", expr, e);

@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use crate::ast::{CompilationUnit, TopLevelDef, FunctionDef, ArgDefList, ArgDef, StatementList, Statement, Number, FunctionCall, ArgList, IdentList, Ident, Opcode};
+use crate::ast::{CompilationUnit, TopLevelDef, FunctionDef, ArgDefList, ArgDef, StatementList, Statement, Number, FunctionCall, ArgList, IdentList, TagList, Tag, PropertyList, Ident, Opcode};
 use crate::MainError;
 use lalrpop_util::{ErrorRecovery, ParseError};
 
@@ -83,7 +83,8 @@ Expr: Box<Statement<'input>> = {
         => Box::new(Statement::IfElse(<>)),
     "if" <Expr> "{" <StatementList> "}"
         => Box::new(Statement::If(<>)),
-    <Block>
+    <Tag> => Box::new(Statement::Tag(<>)),
+    <Block>,
 };
 
 Block: Box<Statement<'input>> =
@@ -151,7 +152,7 @@ FunctionCall: FunctionCall<'input> = {
         ident,
         args
     }
-}
+};
 
 ArgList: ArgList<'input> =
     CommaSeparatedList<Statement> => ArgList(<>);
@@ -162,6 +163,31 @@ IdentList: IdentList<'input> = {
         IdentList(v)
     }
 };
+
+TagList: TagList<'input> =
+    <Tag+> => TagList(<>);
+
+Tag: Tag<'input> = {
+    "<" <ident:Ident> <properties:PropertyList> "/>" => Tag {
+        ident, properties, children: TagList(vec![])
+    },
+    "<" <ident:Ident> <properties:PropertyList> ">"
+    <children:TagList>
+    "</" <right_ident:Ident> ">" =>? {
+        if (ident != right_ident) {
+            Err(ParseError::User {
+                error: MainError::TagOpenTypeIsntTagCloseType
+            })
+        } else {
+            Ok(Tag {
+                ident, properties, children
+            })
+        }
+    }
+};
+
+PropertyList: PropertyList<'input> =
+    (<Ident> "=" <Ident>)* => PropertyList(<>);
 
 Ident: Ident<'input> =
     r"([a-zA-Z]|_)([a-zA-Z0-9]|_)*" => Ident(<>);
