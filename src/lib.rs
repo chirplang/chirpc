@@ -129,9 +129,15 @@ mod test {
 
     #[test]
     fn parse_tag_all_cases() {
-        parse_statement_expect_same("<Tag/>");
-        parse_statement_expect_same("<Tag disable=true/>");
-        parse_statement_expect_same("<Tag disable=true> <OtherTag this=that/> </Tag>");
+        parse_statement_expect("let a = (<Tag/>)", "let a = <Tag/>");
+        parse_statement_expect(
+            "let a = (<Tag disable=true/>)",
+            "let a = <Tag disable=true/>",
+        );
+        parse_statement_expect(
+            "let a = (<Tag disable=true> <OtherTag this=that/> </Tag>)",
+            "let a = <Tag disable=true> <OtherTag this=that/> </Tag>",
+        );
     }
 
     /// `parse_statement_expect(l, l);`

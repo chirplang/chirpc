@@ -52,8 +52,7 @@ SemiColonSeparatedList<T>: Vec<T> = {
 };
 
 StatementList: StatementList<'input> =
-    SemiColonSeparatedList<Statement> => StatementList(<>);
-    // (<Statement> ";"?)* => StatementList(<>);
+    (<Statement> ";"?)* => StatementList(<>);
 
 // Lefthand shouldn't have () but righthand should
 pub Statement: Box<Statement<'input>> = {
@@ -73,13 +72,10 @@ Comp: Box<Statement<'input>> = {
             args
         }
     )),
-    // FunctionCall => Box::new(Statement::FunctionCall(<>)),
-    // "(" <Comp> ")",
     "if" <Comp> "{" <StatementList> "}" "else" "{" <StatementList> "}"
         => Box::new(Statement::IfElse(<>)),
     "if" <Comp> "{" <StatementList> "}"
         => Box::new(Statement::If(<>)),
-    "(" <Tag> ")" => Box::new(Statement::Tag(<>)),
     <Block>,
 };
 
@@ -93,6 +89,7 @@ CompOp: Opcode = {
 };
 
 Expr: Box<Statement<'input>> = {
+    "(" <Tag> ")" => Box::new(Statement::Tag(<>)),
     "(" <Expr> ")",
     Expr ExprOp Factor => Box::new(Statement::Op(<>)),
     Factor,
