@@ -1,22 +1,132 @@
 #[macro_use]
 extern crate lalrpop_util;
+lalrpop_mod!(pub main_parser);
+mod ast;
+mod text;
+mod wasm;
+
+use std::{
+    error::Error,
+    fmt::{self, Display, Formatter},
+    fs,
+    io::{self},
+    path::{Path, PathBuf},
+    rc::Rc,
+};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum MainError {
     InputTooBig,
     TagOpenTypeIsntTagCloseType,
+    CompilationError,
 }
 
-lalrpop_mod!(pub main_parser);
-pub mod ast;
-mod wasm;
+impl Display for MainError {
+    /// FIXME:
+    fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
+        write!(f, "{:?}", self)
+    }
+}
+
+/// Compiles every .chip file in the current directory
+pub fn compile_root() -> Result<(), Box<dyn Error>> {
+    let path = std::env::current_dir()?;
+    compile_folder(&path)
+}
+
+/// Compiles every .chip file in the specified directory
+pub fn compile_folder<P: AsRef<Path>>(path: P) -> Result<(), Box<dyn Error>> {
+    let chip_files = chip_files(path)?;
+    // TODO: Multithreading
+    for chip_file in chip_files {
+        compile_file(chip_file)?;
+    }
+    Ok(())
+}
+
+#[allow(dead_code, unused_variables)]
+fn compile_file(path: PathBuf) -> Result<(), Box<dyn Error>> {
+    let rs_file = resolve_rust_file(path.as_path());
+    println!("[{:?}] Starting compilation...", path);
+
+    if let Some(path) = rs_file.parent() {
+        fs::create_dir_all(path)?;
+    }
+
+    let in_file = Rc::new(text::CodeText::from_path(path.clone())?);
+    // let mut in_file = fs::File::open(chip_file)?;
+    // let mut input = String::new();
+    // in_file.read_to_string(&mut input)?;
+    // let input = Rc::new(input.as_str());
+    if rs_file.exists() {
+        std::fs::remove_file(rs_file.clone())?;
+    }
+    let out_file = fs::File::create(rs_file)?;
+
+    let ast = {
+        let mut e = vec![];
+        let ast = main_parser::CompilationUnitParser::new().parse(&mut e, in_file.text());
+        for error in e {
+            eprintln!("[{:?}] Error occured: {:?}", path, error);
+        }
+        if ast.is_err() {
+            eprintln!("[{:?}] Exiting", path);
+            // FIXME: Error handling & system
+            return Ok(());
+        } else {
+            ast.unwrap()
+        }
+    };
+
+    Ok(())
+}
+
+fn resolve_rust_file(path: &Path) -> PathBuf {
+    let in_dir = Path::new(".");
+    let out_dir = in_dir.clone();
+
+    out_dir
+        .join(path.strip_prefix(&in_dir).unwrap_or(path))
+        .with_extension("chip")
+}
+
+/// Copied from lalrpop
+fn chip_files<P: AsRef<Path>>(root_dir: P) -> Result<Vec<PathBuf>, Box<dyn Error>> {
+    let mut result = vec![];
+    for entry in fs::read_dir(root_dir)? {
+        let entry = entry?;
+        let file_type = entry.file_type()?;
+
+        let path = entry.path();
+
+        if file_type.is_dir() {
+            result.extend(chip_files(&path)?);
+        }
+
+        let is_symlink_file = || -> io::Result<bool> {
+            if !file_type.is_symlink() {
+                Ok(false)
+            } else {
+                // Ensure all symlinks are resolved
+                Ok(fs::metadata(&path)?.is_file())
+            }
+        };
+
+        if (file_type.is_file() || is_symlink_file()?)
+            && path.extension().is_some()
+            && path.extension().unwrap() == "chip"
+        {
+            result.push(path);
+        }
+    }
+    Ok(result)
+}
 
 #[allow(dead_code)]
 #[cfg(test)]
-mod test {
+mod tests {
     use crate::wasm::{compile_statement_wasm, ChipType, LocalMap, Primitive};
     use linked_hash_map::LinkedHashMap;
-    use std::collections::HashMap;
     use std::rc::Rc;
     use std::vec;
     use walrus::{FunctionBuilder, ValType};

@@ -5,7 +5,24 @@ pub struct CompilationUnit<'a>(pub Vec<TopLevelDef<'a>>);
 pub enum TopLevelDef<'a> {
     Func(FunctionDef<'a>),
     Export(Ident<'a>, TagList<'a>),
+    TagDef(TagDef<'a>),
 }
+
+pub struct TagDef<'a> {
+    pub ident: Ident<'a>,
+    pub states: StateList<'a>,
+    pub fns: FunctionDefList<'a>,
+}
+
+pub struct StateList<'a>(pub Vec<State<'a>>);
+
+pub struct State<'a> {
+    pub ident: Ident<'a>,
+    pub chip_type: Option<Ident<'a>>,
+    pub default: Option<Statement<'a>>,
+}
+
+pub struct FunctionDefList<'a>(pub Vec<FunctionDef<'a>>);
 
 pub struct FunctionDef<'a> {
     pub ident: Ident<'a>,
@@ -104,7 +121,39 @@ impl Debug for TopLevelDef<'_> {
         match self {
             Func(fun) => write!(f, "{:?}", fun),
             Export(i, t) => write!(f, "export {:?} {{\n{:?}}}\n", i, t),
+            TagDef(t) => write!(f, "tag {:?} {{\n{:?}\n{:?}}}", t.ident, t.states, t.fns),
         }
+    }
+}
+
+impl Debug for StateList<'_> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        for item in &self.0 {
+            write!(f, "{:?}\n", item)?;
+        }
+        Ok(())
+    }
+}
+
+impl Debug for State<'_> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        write!(f, "state {:?}", self.ident)?;
+        if let Some(t) = &self.chip_type {
+            write!(f, ": {:?}", t)?;
+        }
+        if let Some(s) = &self.default {
+            write!(f, " = {:?}", s)?;
+        }
+        Ok(())
+    }
+}
+
+impl Debug for FunctionDefList<'_> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        for fun in &self.0 {
+            write!(f, "{:?}\n", fun)?;
+        }
+        Ok(())
     }
 }
 
