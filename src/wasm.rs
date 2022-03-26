@@ -4,53 +4,11 @@ use linked_hash_map::LinkedHashMap;
 use walrus::{InstrSeqBuilder, LocalId, ModuleLocals, ModuleTypes, ValType};
 use crate::ast::{Ident, Number, Opcode, Statement, StatementList, Type};
 use walrus::ir::{BinaryOp, Instr, InstrSeq, Value};
+use crate::checking::{ChipType, LocalMap, Primitive};
 
-pub struct LocalMap {
-    pub names: HashMap<String, (Option<LocalId>, ChipType)>
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Primitive {
-    F64,
-    I64
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum ChipType {
-    Struct(Rc<LinkedHashMap<String, ChipType>>),
-    Primitive(Primitive)
-}
-
-impl ChipType {
-
-    pub fn flatten(&self, name: &str) -> LinkedHashMap<String, Primitive> {
-        let mut map = LinkedHashMap::new();
-
-        ChipType::flatten_inner(name, &self, &mut map);
-
-        map
-    }
-
-    fn flatten_inner(name: &str, type_: &ChipType, map: &mut LinkedHashMap<String, Primitive>) {
-        match type_ {
-            ChipType::Struct(struct_) => {
-                struct_.iter().for_each(|(field_name, field_type)| {
-                    let mut recurse_name = name.to_string();
-                    recurse_name.push_str(".");
-                    recurse_name.push_str(field_name);
-
-                    ChipType::flatten_inner(&recurse_name, field_type, map);
-                })
-            }
-            ChipType::Primitive(primitive) => { map.insert(name.into(), *primitive); }
-        }
-    }
-
-}
-
-pub fn compile_statement_wasm<'a>(builder: &mut InstrSeqBuilder, func_locals: &'a mut LocalMap, module_locals: &mut ModuleLocals, statement: &Statement) -> Option<ChipType> {
+pub fn compile_statement_wasm<'a>(builder: &mut InstrSeqBuilder, func_locals: &'a mut LocalMap<LocalId>, module_locals: &mut ModuleLocals, statement: &Statement) -> Option<ChipType> {
     match statement {
-        Statement::Number(num) => {
+        Statement::Number(num, range) => {
            return match num {
                 Number::Int(int) => {
                     builder.i64_const(*int);
@@ -64,39 +22,11 @@ pub fn compile_statement_wasm<'a>(builder: &mut InstrSeqBuilder, func_locals: &'
                 }
             };
         }
-        Statement::Op(statement_1, comp, statement_2) => {
+        Statement::Op(statement_1, comp, statement_2, range) => {
             let st_1 = compile_statement_wasm(builder, func_locals, module_locals, statement_1);
             let st_2 = compile_statement_wasm(builder, func_locals, module_locals, statement_2);
 
-            //TODO: this is horrible
-            let int_or_float = match &st_1 {
-                None => panic!("Operation {:?} must have left hand value", statement_1),
-                Some(_type1) => {
-                    match &st_2 {
-                        None => panic!("Operation {:?} must have right hand value", statement_2),
-                        Some(_type2) => {
-                            match _type1 {
-                                ChipType::Struct(_) => panic!("Cannot use struct in operation"),
-                                ChipType::Primitive(prim1) => {
-                                    match _type2 {
-                                        ChipType::Struct(_) => panic!("Cannot use struct in operation"),
-                                        ChipType::Primitive(prim2) => {
-                                            if prim1 == prim2 {
-                                                match prim1 {
-                                                    Primitive::F64 => false,
-                                                    Primitive::I64 => true
-                                                }
-                                            } else {
-                                                panic!("Comparison must have same type of values on bot sides");
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            };
+            let int_or_float = st_1 == st_2 && st_1 == Some(ChipType::Primitive(Primitive::I64));
 
             match comp {
                 Opcode::Mul => builder.binop(if int_or_float { BinaryOp::I64Mul } else { BinaryOp::F64Mul }),
@@ -114,8 +44,8 @@ pub fn compile_statement_wasm<'a>(builder: &mut InstrSeqBuilder, func_locals: &'
             //Specifically make sure that there is a value here
             return Some(st_1.unwrap());
         }
-        Statement::FunctionCall(_) => {}
-        Statement::If(condition, block) => {
+        Statement::FunctionCall(_, range) => {}
+        Statement::If(condition, block, range) => {
             // let mut consequent = builder.dangling_instr_seq(None);
             //
             // let no_else = builder.dangling_instr_seq(None);
@@ -147,21 +77,16 @@ pub fn compile_statement_wasm<'a>(builder: &mut InstrSeqBuilder, func_locals: &'
             //     }
             // }, );
         }
-        Statement::IfElse(_, _, _) => {}
-        Statement::Assign(ident, assign_statement) => {
+        Statement::IfElse(_, _, _, range) => {}
+        Statement::Assign(ident, assign_statement, range) => {
             //Push the right hand value onto the stack
             let statement_type = compile_statement_wasm(builder, func_locals, module_locals, &assign_statement)
-                .expect("Right-hand side of let assignment must have return type");
+                .unwrap();
 
             let left_name: String = ident.0.iter().rev()
                 .map(|ident| ident.0).collect::<Vec<&str>>().join(".");
 
-            println!("{:?}\n{}", func_locals.names, left_name);
             let ident_type = func_locals.names.get(&left_name).unwrap();
-
-            if statement_type != ident_type.1 {
-                panic!("Assignment `{:?}` must have same type on left and right hand side", statement);
-            }
 
             let primitives = ident_type.1.flatten(
                 &left_name
@@ -174,10 +99,9 @@ pub fn compile_statement_wasm<'a>(builder: &mut InstrSeqBuilder, func_locals: &'
                 builder.local_set(local);
             });
         }
-        Statement::Ident(ident) => {
-            let local = func_locals.names.get(ident.0).expect(
-                &format!("Undeclared local variable {}", ident.0)
-            );
+        Statement::Ident(ident, range) => {
+            let local = func_locals.names.get(ident.0)
+                .unwrap();
 
             let primitives = local.1.flatten(ident.0);
 
@@ -190,11 +114,11 @@ pub fn compile_statement_wasm<'a>(builder: &mut InstrSeqBuilder, func_locals: &'
 
             return Some(local.1.clone());
         }
-        Statement::Let(_) => {}
-        Statement::LetAssign(ident, statement) => {
+        Statement::Let(_, range) => {}
+        Statement::LetAssign(ident, statement, range) => {
             //Push the right hand value onto the stack
             let type_ = compile_statement_wasm(builder, func_locals, module_locals, &statement)
-                .expect("Right-hand side of let assignment must have return type");
+                .unwrap();
 
             let primitives = type_.flatten(ident.0);
 
@@ -212,7 +136,7 @@ pub fn compile_statement_wasm<'a>(builder: &mut InstrSeqBuilder, func_locals: &'
                 builder.local_set(local);
             });
         }
-        Statement::Block(statements) => {
+        Statement::Block(statements, range) => {
             return statements.0.iter().map(|statement| {
                 compile_statement_wasm(builder, func_locals, module_locals, &statement)
             }).last().flatten()

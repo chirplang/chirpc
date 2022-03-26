@@ -23,16 +23,16 @@ pub struct ArgDef<'a> {
 pub struct StatementList<'a>(pub Vec<Box<Statement<'a>>>);
 
 pub enum Statement<'a> {
-    Number(Number),
-    Op(Box<Statement<'a>>, Opcode, Box<Statement<'a>>),
-    FunctionCall(FunctionCall<'a>),
-    If(Box<Statement<'a>>, StatementList<'a>),
-    IfElse(Box<Statement<'a>>, StatementList<'a>, StatementList<'a>),
-    Let(Ident<'a>),
-    LetAssign(Ident<'a>, Box<Statement<'a>>),
-    Assign(IdentList<'a>, Box<Statement<'a>>),
-    Ident(Ident<'a>),
-    Block(StatementList<'a>),
+    Number(Number, (usize, usize)),
+    Op(Box<Statement<'a>>, Opcode, Box<Statement<'a>>, (usize, usize)),
+    FunctionCall(FunctionCall<'a>, (usize, usize)),
+    If(Box<Statement<'a>>, StatementList<'a>, (usize, usize)),
+    IfElse(Box<Statement<'a>>, StatementList<'a>, StatementList<'a>, (usize, usize)),
+    Let(Ident<'a>, (usize, usize)),
+    LetAssign(Ident<'a>, Box<Statement<'a>>, (usize, usize)),
+    Assign(IdentList<'a>, Box<Statement<'a>>, (usize, usize)),
+    Ident(Ident<'a>, (usize, usize)),
+    Block(StatementList<'a>, (usize, usize)),
     Error,
 }
 
@@ -45,7 +45,7 @@ pub struct ArgList<'a>(pub Vec<Box<Statement<'a>>>);
 
 pub struct IdentList<'a>(pub Vec<Ident<'a>>);
 
-pub struct Ident<'a>(pub &'a str);
+pub struct Ident<'a>(pub &'a str, pub(crate) (usize, usize));
 
 pub struct Struct<'a> {
     pub ident: Ident<'a>,
@@ -147,19 +147,19 @@ impl Debug for Statement<'_> {
     fn fmt(&self, fmt: &mut Formatter) -> Result<(), Error> {
         use self::Statement::*;
         match self {
-            Number(n) => write!(fmt, "{:?}", n),
-            Op(ref l, op, ref r) => write!(fmt, "({:?} {:?} {:?})", l, op, r),
-            FunctionCall(f) => write!(fmt, "{:?}", f),
-            If(cond, exprs) => write!(fmt, "if {:?} {:?}", cond, exprs),
-            IfElse(cond, if_exprs, else_exprs) => {
+            Number(n, ..) => write!(fmt, "{:?}", n),
+            Op(ref l, op, ref r, ..) => write!(fmt, "({:?} {:?} {:?})", l, op, r),
+            FunctionCall(f, ..) => write!(fmt, "{:?}", f),
+            If(cond, exprs, ..) => write!(fmt, "if {:?} {:?}", cond, exprs),
+            IfElse(cond, if_exprs, else_exprs, ..) => {
                 write!(fmt, "if {:?} {:?} else {:?}", cond, if_exprs, else_exprs)
             }
-            Let(i) => write!(fmt, "let {:?}", i),
-            LetAssign(i, a) => write!(fmt, "let {:?} = {:?}", i, a),
-            Assign(l, r) => write!(fmt, "{:?} = {:?}", l, r),
-            Ident(i) => write!(fmt, "{:?}", i),
+            Let(i, ..) => write!(fmt, "let {:?}", i),
+            LetAssign(i, a, ..) => write!(fmt, "let {:?} = {:?}", i, a),
+            Assign(l, r, ..) => write!(fmt, "{:?} = {:?}", l, r),
+            Ident(i, ..) => write!(fmt, "{:?}", i),
             Error => write!(fmt, "error"),
-            Block(list) => write!(fmt, "{:?}", list),
+            Block(list, ..) => write!(fmt, "{:?}", list),
         }
     }
 }

@@ -12,7 +12,7 @@ extern {
 pub CompilationUnit: CompilationUnit<'input> = <TopLevelDef*> => CompilationUnit(<>);
 
 TopLevelDef: TopLevelDef<'input> = {
-    <FunctionDef> => TopLevelDef::Func(<>)
+    "fn" <FunctionDef> => TopLevelDef::Func(<>)
 };
 
 FunctionDef: FunctionDef<'input> = {
@@ -54,15 +54,15 @@ StatementList: StatementList<'input> =
     SemiColonSeparatedList<Statement> => StatementList(<>);
 
 pub Statement: Box<Statement<'input>> = {
-    <IdentList> "=" <Expr> => Box::new(Statement::Assign(<>)),
-    "let" <Ident> => Box::new(Statement::Let(<>)),
-    "let" <Ident> "=" <Expr> => Box::new(Statement::LetAssign(<>)),
-    <Comp>,
+    <l:@L> <i:IdentList> "=" <e:Expr> <r:@R> => Box::new(Statement::Assign(i, e, (l ,r))),
+    <l:@L> "let" <i:Ident> <r:@R> => Box::new(Statement::Let(i, (l, r))),
+    <l:@L> "let" <i:Ident> "=" <e:Expr> <r:@R> => Box::new(Statement::LetAssign(i, e, (l, r))),
+    <Comp>
 };
 
 
 Comp: Box<Statement<'input>> = {
-    <Comp> <CompOp> <Expr> => Box::new(Statement::Op(<>)),
+    <l:@L> <c:Comp> <o:CompOp> <e:Expr> <r:@R> => Box::new(Statement::Op(c, o, e, (l, r))),
     <Expr>,
 };
 
@@ -76,19 +76,19 @@ CompOp: Opcode = {
 };
 
 Expr: Box<Statement<'input>> = {
-    Expr ExprOp Factor => Box::new(Statement::Op(<>)),
-    FunctionCall => Box::new(Statement::FunctionCall(<>)),
-    Factor,
-    "if" <Expr> "{" <StatementList> "}" "else" "{" <StatementList> "}"
-        => Box::new(Statement::IfElse(<>)),
-    "if" <Expr> "{" <StatementList> "}"
-        => Box::new(Statement::If(<>)),
-    Ident => Box::new(Statement::Ident(<>)),
+    <l:@L> <e:Expr> <o:ExprOp> <f:Factor> <r:@R> => Box::new(Statement::Op(e, o, f, (l, r))),
+    <l:@L> <f:FunctionCall> <r:@R> => Box::new(Statement::FunctionCall(f, (l, r))),
+    <Factor>,
+    <l:@L> "if" <e:Expr> "{" <s:StatementList> "}" "else" "{" <s2:StatementList> "}" <r:@R>
+        => Box::new(Statement::IfElse(e, s, s2, (l, r))),
+    <l:@L> "if" <e:Expr> "{" <s:StatementList> "}" <r:@R>
+        => Box::new(Statement::If(e, s, (l, r))),
+    <l:@L> <i:Ident> <r:@R> => Box::new(Statement::Ident(i, (l, r))),
     <Block>
 };
 
 Block: Box<Statement<'input>> =
-    "{" <StatementList> "}" => Box::new(Statement::Block(<>));
+    <l:@L> "{" <s:StatementList> "}" <r:@R> => Box::new(Statement::Block(s, (l, r)));
 
 ExprOp: Opcode = {
     "+" => Opcode::Add,
@@ -96,7 +96,7 @@ ExprOp: Opcode = {
 };
 
 Factor: Box<Statement<'input>> = {
-    Factor FactorOp Term => Box::new(Statement::Op(<>)),
+    <l:@L> <f:Factor> <o:FactorOp> <t:Term> <r:@R> => Box::new(Statement::Op(f, o, t, (l, r))),
     Term,
 };
 
@@ -106,7 +106,7 @@ FactorOp: Opcode = {
 };
 
 Term: Box<Statement<'input>> = {
-    Num => Box::new(Statement::Number(<>)),
+    <l:@L> <n:Num> <r:@R> => Box::new(Statement::Number(n, (l, r))),
     "(" <Expr> ")",
     ! => { errors.push(<>); Box::new(Statement::Error) },
 };
@@ -164,4 +164,4 @@ IdentList: IdentList<'input> = {
 };
 
 Ident: Ident<'input> =
-    r"([a-zA-Z]|_)([a-zA-Z0-9]|_)*" => Ident(<>);
+    <l:@L> <i:r"([a-zA-Z]|_)([a-zA-Z0-9]|_)*"> <r:@R> => Ident(i, (l, r));

@@ -9,15 +9,21 @@ pub enum MainError {
 lalrpop_mod!(pub main_parser);
 pub mod ast;
 mod wasm;
+pub mod checking;
 
 #[cfg(test)]
 mod test {
-    use crate::wasm::{compile_statement_wasm, ChipType, LocalMap, Primitive};
+    use crate::wasm::{compile_statement_wasm};
     use linked_hash_map::LinkedHashMap;
     use std::collections::HashMap;
     use std::rc::Rc;
     use std::vec;
+    use codespan_reporting::diagnostic::Diagnostic;
+    use codespan_reporting::files::SimpleFile;
+    use codespan_reporting::term;
+    use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
     use walrus::{FunctionBuilder, ValType};
+    use crate::checking::{ChipType, LocalMap, Primitive, type_check_statement};
 
     use super::*;
 
@@ -145,18 +151,22 @@ mod test {
     fn wasm_let_binding() {
         let mut e = vec![];
 
+        let code = r#"
+{
+    let a = test_struct;
+    let b = 1;
+    b = test_struct + 1;
+}
+        "#;
+
         if !e.is_empty() {
             panic!("{:?}", e);
         }
 
         let statement = main_parser::StatementParser::new().parse(
             &mut e,
-            r#"
-            {   let a = test_struct;
-                a.field_1 = test_struct;
-            }
-            "#,
-        );
+            code,
+        ).unwrap();
 
         let mut module = walrus::Module::default();
 
@@ -186,23 +196,37 @@ mod test {
 
         func_locals.names.insert(
             "test_struct".into(),
-            (None, ChipType::Struct(Rc::new(test_struct_def))),
+            (None, ChipType::Struct(Rc::new((String::from("TestStruct"), (test_struct_def))))),
         );
 
-        compile_statement_wasm(
-            &mut func.func_body(),
+        match type_check_statement(
             &mut func_locals,
-            module_locals,
-            &statement.unwrap(),
-        );
+            &statement
+        ) {
+            Ok(_) => {
+                compile_statement_wasm(
+                    &mut func.func_body(),
+                    &mut func_locals,
+                    module_locals,
+                    &statement,
+                );
 
-        dbg!(
-            "{:?}",
-            func.func_body()
-                .instrs()
-                .iter()
-                .map(|t| &t.0)
-                .collect::<Vec<_>>()
-        );
+                dbg!(
+                    "{:?}",
+                    func.func_body()
+                        .instrs()
+                        .iter()
+                        .map(|t| &t.0)
+                        .collect::<Vec<_>>()
+                );
+            }
+            Err(diagnostic) => {
+                let file = SimpleFile::new("test.chip", code);
+
+                let writer = StandardStream::stderr(ColorChoice::Always);
+                let config = codespan_reporting::term::Config::default();
+                term::emit(&mut writer.lock(), &config, &file, &diagnostic).unwrap();
+            }
+        };
     }
 }
