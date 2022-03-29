@@ -4,6 +4,7 @@ use std::{
     path::PathBuf,
 };
 
+#[derive(Debug, Clone)]
 pub struct CodeText {
     path: PathBuf,
     text: String,
@@ -37,6 +38,10 @@ impl CodeText {
 
     pub fn text(&self) -> &String {
         &self.text
+    }
+
+    pub fn path(&self) -> &PathBuf {
+        &self.path
     }
 
     fn line_col(&self, pos: usize) -> (usize, usize) {

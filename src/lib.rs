@@ -14,19 +14,43 @@ use std::{
     rc::Rc,
 };
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum MainError {
+use lalrpop_util::{lexer::Token, ErrorRecovery};
+
+#[derive(Debug)]
+pub enum ChipError<'a> {
+    Multiple(Vec<Box<dyn Error + 'a>>),
     InputTooBig,
-    TagOpenTypeIsntTagCloseType,
-    CompilationError,
+    TagClosedIncorrectly,
+    ParserError(
+        Rc<text::CodeText>,
+        Vec<ErrorRecovery<usize, Token<'a>, ChipError<'a>>>,
+        Box<dyn Error + 'a>,
+    ),
 }
 
-impl Display for MainError {
-    /// FIXME:
+impl Display for ChipError<'_> {
     fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
-        write!(f, "{:?}", self)
+        match self {
+            InputTooBig => write!(f, "[MainError InputTooBig]"),
+            TagClosedIncorrectly => write!(f, "[MainError TagClosedIncorrectly]"),
+            ChipError::ParserError(text, errorvec, err) => write!(
+                f,
+                "[MainError Parser on file {:?}:  Error {:?} with error vec {:?}",
+                text.path(),
+                err,
+                errorvec
+            ),
+            ChipError::Multiple(errs) => {
+                for err in errs {
+                    write!(f, "{:?}\n", err)?;
+                }
+                Ok(())
+            }
+        }
     }
 }
+
+impl Error for ChipError<'_> {}
 
 /// Compiles every .chip file in the current directory
 pub fn compile_root() -> Result<(), Box<dyn Error>> {
@@ -37,11 +61,22 @@ pub fn compile_root() -> Result<(), Box<dyn Error>> {
 /// Compiles every .chip file in the specified directory
 pub fn compile_folder<P: AsRef<Path>>(path: P) -> Result<(), Box<dyn Error>> {
     let chip_files = chip_files(path)?;
+    let mut results = vec![];
     // TODO: Multithreading
     for chip_file in chip_files {
-        compile_file(chip_file)?;
+        results.push(compile_file(chip_file));
     }
-    Ok(())
+    let err_results = vec![];
+    for res in results {
+        if res.is_err() {
+            err_results.push(res.unwrap_err());
+        }
+    }
+    if err_results.is_empty() {
+        Ok(())
+    } else {
+        Err(Box::new(ChipError::Multiple(err_results)))
+    }
 }
 
 #[allow(dead_code, unused_variables)]
@@ -54,10 +89,6 @@ fn compile_file(path: PathBuf) -> Result<(), Box<dyn Error>> {
     }
 
     let in_file = Rc::new(text::CodeText::from_path(path.clone())?);
-    // let mut in_file = fs::File::open(chip_file)?;
-    // let mut input = String::new();
-    // in_file.read_to_string(&mut input)?;
-    // let input = Rc::new(input.as_str());
     if rs_file.exists() {
         std::fs::remove_file(rs_file.clone())?;
     }
@@ -66,15 +97,15 @@ fn compile_file(path: PathBuf) -> Result<(), Box<dyn Error>> {
     let ast = {
         let mut e = vec![];
         let ast = main_parser::CompilationUnitParser::new().parse(&mut e, in_file.text());
-        for error in e {
-            eprintln!("[{:?}] Error occured: {:?}", path, error);
-        }
-        if ast.is_err() {
-            eprintln!("[{:?}] Exiting", path);
-            // FIXME: Error handling & system
-            return Ok(());
-        } else {
-            ast.unwrap()
+        match ast {
+            Err(err) => {
+                return Err(Box::new(ChipError::ParserError(
+                    in_file.clone(),
+                    e,
+                    Box::new(err),
+                )));
+            }
+            Ok(ast) => ast,
         }
     };
 
@@ -126,6 +157,7 @@ fn chip_files<P: AsRef<Path>>(root_dir: P) -> Result<Vec<PathBuf>, Box<dyn Error
 #[cfg(test)]
 mod tests {
     use crate::wasm::{compile_statement_wasm, ChipType, LocalMap, Primitive};
+    use lalrpop_util::lexer::Token;
     use linked_hash_map::LinkedHashMap;
     use std::rc::Rc;
     use std::vec;
@@ -154,10 +186,13 @@ mod tests {
         let expr = main_parser::StatementParser::new().parse(&mut errors, "9223372036854775808");
         assert!(expr.is_err());
         assert_eq!(
-            expr.unwrap_err(),
-            lalrpop_util::ParseError::User {
-                error: MainError::InputTooBig
-            }
+            format!("{:?}", expr.unwrap_err()),
+            format!(
+                "{:?}",
+                lalrpop_util::ParseError::User::<usize, Token, _> {
+                    error: ChipError::InputTooBig
+                }
+            )
         );
     }
 
