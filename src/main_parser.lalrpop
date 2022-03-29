@@ -1,12 +1,12 @@
 use std::str::FromStr;
 use crate::ast::{CompilationUnit, TopLevelDef, FunctionDef, ArgDefList, ArgDef, StatementList, Statement, Number, FunctionCall, ArgList, IdentList, TagList, Tag, PropertyList, Ident, Opcode};
-use crate::MainError;
+use crate::ChipError;
 use lalrpop_util::{ErrorRecovery, ParseError};
 
-grammar<'err>(errors: &'err mut Vec<ErrorRecovery<usize, Token<'input>, MainError>>);
+grammar<'err>(errors: &'err mut Vec<ErrorRecovery<usize, Token<'input>, ChipError<'input>>>);
 
 extern {
-    type Error = MainError;
+    type Error = ChipError<'input>;
 }
 
 pub CompilationUnit: CompilationUnit<'input> = <TopLevelDef*> => CompilationUnit(<>);
@@ -129,32 +129,32 @@ Num: Number = {
     // Standard int with - or + at the start
     r"(\+|\-)?[0-9]+" =>? i64::from_str(<>)
         .map_err(|_| ParseError::User {
-            error: MainError::InputTooBig
+            error: ChipError::InputTooBig
         })
         .map(|raw| Number::Int(raw)),
     // Hexadecimal int without unary + or -
     r"0x([0-9a-fA-F])+" =>? i64::from_str_radix(&<>[2..], 16)
         .map_err(|_| ParseError::User {
-            error: MainError::InputTooBig
+            error: ChipError::InputTooBig
         })
         .map(|raw| Number::Int(raw)),
     // Hexadecimal int with unary + or -
     r"(\+|\-)0x([0-9a-fA-F])+" =>?i64::from_str_radix(&<>[3..], 16)
         .map_err(|_| ParseError::User {
-            error: MainError::InputTooBig
+            error: ChipError::InputTooBig
         })
         .map(|raw| if <>.starts_with('-') { Number::Int(-raw) }
             else { Number::Int(raw) }),
     // Standard float with optional exponent and + or - at the start
     r"(\+|\-)?[0-9]+\.[0-9]+((e|E)[0-9]+)?" =>? f64::from_str(<>)
         .map_err(|_| ParseError::User {
-            error: MainError::InputTooBig
+            error: ChipError::InputTooBig
         })
         .map(|raw| Number::Float(raw)),
     // Float with no dot but exponent
     r"(\+|\-)?[0-9]+(e|E)[0-9]+" =>? f64::from_str(<>)
         .map_err(|_| ParseError::User {
-            error: MainError::InputTooBig
+            error: ChipError::InputTooBig
         })
         .map(|raw| Number::Float(raw)),
 };
@@ -181,7 +181,7 @@ Tag: Tag<'input> = {
     "</" <right_ident:Ident> ">" =>? {
         if (ident != right_ident) {
             Err(ParseError::User {
-                error: MainError::TagOpenTypeIsntTagCloseType
+                error: ChipError::TagClosedIncorrectly
             })
         } else {
             Ok(Tag {

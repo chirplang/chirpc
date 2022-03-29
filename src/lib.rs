@@ -66,7 +66,7 @@ pub fn compile_folder<P: AsRef<Path>>(path: P) -> Result<(), Box<dyn Error>> {
     for chip_file in chip_files {
         results.push(compile_file(chip_file));
     }
-    let err_results = vec![];
+    let mut err_results = vec![];
     for res in results {
         if res.is_err() {
             err_results.push(res.unwrap_err());
@@ -99,11 +99,7 @@ fn compile_file(path: PathBuf) -> Result<(), Box<dyn Error>> {
         let ast = main_parser::CompilationUnitParser::new().parse(&mut e, in_file.text());
         match ast {
             Err(err) => {
-                return Err(Box::new(ChipError::ParserError(
-                    in_file.clone(),
-                    e,
-                    Box::new(err),
-                )));
+                return Err(Box::new(ChipError::ParserError(in_file, e, Box::new(err))));
             }
             Ok(ast) => ast,
         }
