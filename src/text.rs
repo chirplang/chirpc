@@ -1,4 +1,5 @@
 use std::{
+    fmt::{Display, Error, Formatter},
     fs::File,
     io::{self, Read},
     path::PathBuf,
@@ -44,7 +45,7 @@ impl CodeText {
         &self.path
     }
 
-    fn line_col(&self, pos: usize) -> (usize, usize) {
+    pub fn line_col(&self, pos: usize) -> TextLocation {
         let num_lines = self.newlines.len();
         let line = (0..num_lines)
             .filter(|&i| self.newlines[i] > pos)
@@ -59,10 +60,10 @@ impl CodeText {
         // newline itself, which we'll call column 0
         let col = pos - line_offset;
 
-        (line, col)
+        TextLocation(line, col)
     }
 
-    fn line_text(&self, line_num: usize) -> &str {
+    pub fn line_text(&self, line_num: usize) -> &str {
         let start_offset = self.newlines[line_num];
         if line_num == self.newlines.len() - 1 {
             &self.text[start_offset..]
@@ -70,5 +71,14 @@ impl CodeText {
             let end_offset = self.newlines[line_num + 1];
             &self.text[start_offset..end_offset - 1]
         }
+    }
+}
+
+/// A location in text, specified by line and colon numbers
+pub struct TextLocation(pub usize, pub usize);
+
+impl Display for TextLocation {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        write!(f, "{}:{}", self.0, self.1)
     }
 }
