@@ -2,56 +2,19 @@
 extern crate lalrpop_util;
 lalrpop_mod!(pub main_parser);
 mod ast;
+pub mod error;
 mod text;
 mod wasm;
 
 use std::{
     error::Error,
-    fmt::{self, Display, Formatter},
     fs,
     io::{self},
     path::{Path, PathBuf},
     rc::Rc,
 };
 
-use lalrpop_util::{lexer::Token, ErrorRecovery, ParseError};
-
-#[derive(Debug)]
-pub enum ChipError<'a> {
-    Multiple(Vec<Box<dyn Error + 'a>>),
-    InputTooBig,
-    TagClosedIncorrectly,
-    PreFormatted(String),
-    ParserError(
-        Rc<text::CodeText>,
-        Vec<ErrorRecovery<usize, Token<'a>, ChipError<'a>>>,
-        Box<dyn Error + 'a>,
-    ),
-}
-
-impl Display for ChipError<'_> {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
-        match self {
-            InputTooBig => write!(f, "[MainError InputTooBig]"),
-            TagClosedIncorrectly => write!(f, "[MainError TagClosedIncorrectly]"),
-            ChipError::ParserError(text, errorvec, err) => write!(
-                f,
-                "[MainError Parser on file {:?}:  Error {:?} with error vec {:?}",
-                text.path(),
-                err,
-                errorvec
-            ),
-            ChipError::Multiple(errs) => {
-                for err in errs {
-                    write!(f, "{:?}\n", err)?;
-                }
-                Ok(())
-            }
-        }
-    }
-}
-
-impl Error for ChipError<'_> {}
+use error::ChipError;
 
 /// Compiles every .chip file in the current directory
 pub fn compile_root() -> Result<(), Box<dyn Error>> {
@@ -100,7 +63,7 @@ fn compile_file(path: PathBuf) -> Result<(), Box<dyn Error>> {
         let ast = main_parser::CompilationUnitParser::new().parse(&mut e, in_file.text());
         match ast {
             Err(err) => {
-                let err = format_parse_error(in_file.clone(), err);
+                let err = error::format_parse_error(in_file.clone(), err);
                 return Err(Box::new(err));
             }
             Ok(ast) => ast,
@@ -108,58 +71,6 @@ fn compile_file(path: PathBuf) -> Result<(), Box<dyn Error>> {
     };
 
     Ok(())
-}
-
-/// FIXME: This formatting is bad, the whole error system should be in it's own file, and there's not enough information in here.
-/// FIXME: So if you wanna, please fix this. Ideally this should create the same quality errors as rustc does.
-fn format_parse_error<'a>(
-    in_file: Rc<text::CodeText>,
-    err: ParseError<usize, Token, ChipError>,
-) -> ChipError<'a> {
-    let out = match err {
-        ParseError::InvalidToken { location } => (
-            Some(in_file.line_col(location)),
-            format!("Encountered invalid token"),
-        ),
-        ParseError::UnrecognizedEOF { location, expected } => (
-            Some(in_file.line_col(location)),
-            format!("Encountered unexpected EOF, expected one of {:?}", expected),
-        ),
-        ParseError::UnrecognizedToken { token, expected } => {
-            let loc = in_file.line_col(token.0);
-            (
-                Some(loc),
-                format!(
-                    "Encountered unrecognised token {} at {} - {}, expected one of {:?}",
-                    token.1, token.0, token.2, expected
-                ),
-            )
-        }
-        ParseError::ExtraToken { token } => {
-            let loc = in_file.line_col(token.0);
-            (
-                Some(loc),
-                format!(
-                    "Encountered extra token {} at {} - {}",
-                    token.1, token.0, token.2
-                ),
-            )
-        }
-        ParseError::User { error } => (None, format!("{:?}", error)),
-    };
-
-    let out = if let Some(loc) = out.0 {
-        format!(
-            "{:?}:{} {}\n{}\n",
-            in_file.path(),
-            loc,
-            out.1,
-            in_file.line_text(loc.0)
-        )
-    } else {
-        format!("{:?} {}\n", in_file.path(), out.1)
-    };
-    ChipError::PreFormatted(out)
 }
 
 fn resolve_rust_file(path: &Path) -> PathBuf {
