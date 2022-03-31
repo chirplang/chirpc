@@ -1,6 +1,6 @@
 #[macro_use]
 extern crate lalrpop_util;
-lalrpop_mod!(pub main_parser);
+lalrpop_mod!(#[allow(clippy::all, warnings)] pub main_parser);
 mod ast;
 pub mod error;
 mod text;
