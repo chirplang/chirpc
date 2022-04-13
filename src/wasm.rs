@@ -1,3 +1,5 @@
+// FIXME: As soon as this isn't in heavy development anymore, REMOVE THIS
+#![allow(unused_imports, dead_code, unused_variables)]
 use crate::ast::{Ident, Number, Opcode, Statement, StatementList, Type};
 use linked_hash_map::LinkedHashMap;
 use std::collections::{BTreeMap, HashMap};
@@ -68,32 +70,50 @@ pub fn compile_statement_wasm<'a>(
             };
         }
         Statement::Op(statement_1, comp, statement_2) => {
-            let st_1 = compile_statement_wasm(builder, func_locals, module_locals, statement_1);
-            let st_2 = compile_statement_wasm(builder, func_locals, module_locals, statement_2);
+            let type_1 = compile_statement_wasm(builder, func_locals, module_locals, statement_1)
+                .unwrap_or_else(|| panic!("Statement {:?} must have return value", statement_1));
+            let type_2 = compile_statement_wasm(builder, func_locals, module_locals, statement_2)
+                .unwrap_or_else(|| panic!("Statement {:?} must have return value", statement_2));
+
+            let primitive_1 = match type_1 {
+                ChipType::Struct(_) => panic!("Cannot use struct in operation"),
+                ChipType::Primitive(prim) => prim,
+            };
+
+            let primitive_2 = match type_2 {
+                ChipType::Struct(_) => panic!("Cannot use struct in operation"),
+                ChipType::Primitive(prim) => prim,
+            };
+
+            if primitive_1 != primitive_2 {
+                panic!("Comparison must have same type of values on both sides");
+            }
+
+            let int_or_float = primitive_1 == Primitive::I64;
 
             //TODO: this is horrible
-            let int_or_float = match &st_1 {
-                None => panic!("Operation {:?} must have left hand value", statement_1),
-                Some(_type1) => match &st_2 {
-                    None => panic!("Operation {:?} must have right hand value", statement_2),
-                    Some(_type2) => match _type1 {
-                        ChipType::Struct(_) => panic!("Cannot use struct in operation"),
-                        ChipType::Primitive(prim1) => match _type2 {
-                            ChipType::Struct(_) => panic!("Cannot use struct in operation"),
-                            ChipType::Primitive(prim2) => {
-                                if prim1 == prim2 {
-                                    match prim1 {
-                                        Primitive::F64 => false,
-                                        Primitive::I64 => true,
-                                    }
-                                } else {
-                                    panic!("Comparison must have same type of values on bot sides");
-                                }
-                            }
-                        },
-                    },
-                },
-            };
+            // let int_or_float = match &st_1 {
+            //     None => panic!("Operation {:?} must have left hand value", statement_1),
+            //     Some(_type1) => match &st_2 {
+            //         None => panic!("Operation {:?} must have right hand value", statement_2),
+            //         Some(_type2) => match _type1 {
+            //             ChipType::Struct(_) => panic!("Cannot use struct in operation"),
+            //             ChipType::Primitive(prim1) => match _type2 {
+            //                 ChipType::Struct(_) => panic!("Cannot use struct in operation"),
+            //                 ChipType::Primitive(prim2) => {
+            //                     if prim1 == prim2 {
+            //                         match prim1 {
+            //                             Primitive::F64 => false,
+            //                             Primitive::I64 => true,
+            //                         }
+            //                     } else {
+            //                         panic!("Comparison must have same type of values on bot sides");
+            //                     }
+            //                 }
+            //             },
+            //         },
+            //     },
+            // };
 
             match comp {
                 Opcode::Mul => builder.binop(if int_or_float {
@@ -149,7 +169,7 @@ pub fn compile_statement_wasm<'a>(
             };
 
             //Specifically make sure that there is a value here
-            return Some(st_1.unwrap());
+            return Some(type_2);
         }
         Statement::FunctionCall(_) => {}
         Statement::If(condition, block) => {
