@@ -246,13 +246,27 @@ mod tests {
         );
     }
 
+    #[test]
+    fn parse_tag_def() {
+        parse_compilation_unit_expect(
+            "
+        tag MyTag { 
+            state something = other()
+            state next: Int
+            view() -> Tag {
+            }
+        }",
+            "tag MyTag {\nstate something = other()\nstate next: Int\n\nview() -> Tag { \n }\n}",
+        );
+    }
+
     /// `parse_statement_expect(l, l);`
     fn parse_compilation_unit_expect_same(l: &str) {
         parse_compilation_unit_expect(l, l);
     }
 
     fn parse_compilation_unit_expect(l: &str, r: &str) {
-        println!("Testing that parsed {:?} == {:?}", l, r);
+        println!("Testing that parsed \"{}\" == \"{}\"", l, r);
         let mut e = vec![];
         let expr = main_parser::CompilationUnitParser::new().parse(&mut e, l);
         println!("{:?} with error vec {:?}", expr, e);
@@ -267,7 +281,7 @@ mod tests {
 
     /// Convenience func, this parses l and makes sure it's string representation equals r
     fn parse_statement_expect(l: &str, r: &str) {
-        println!("Testing that parsed {:?} == {:?}", l, r);
+        println!("Testing that parsed \"{}\" == \"{}\"", l, r);
         let mut e = vec![];
         let expr = main_parser::StatementParser::new().parse(&mut e, l);
         println!("{:?} with error vec {:?}", expr, e);

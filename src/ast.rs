@@ -19,7 +19,7 @@ pub struct StateList<'a>(pub Vec<State<'a>>);
 pub struct State<'a> {
     pub ident: Ident<'a>,
     pub chip_type: Option<Ident<'a>>,
-    pub default: Option<Statement<'a>>,
+    pub default: Option<Box<Statement<'a>>>,
 }
 
 pub struct FunctionDefList<'a>(pub Vec<FunctionDef<'a>>);
@@ -126,6 +126,19 @@ impl Debug for TopLevelDef<'_> {
     }
 }
 
+impl Debug for TagDef<'_> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        write!(f, "tag {:?} {{\n", self.ident)?;
+        for state in &self.states.0 {
+            write!(f, "{:?}\n", state)?;
+        }
+        for func in &self.fns.0 {
+            write!(f, "{:?}\n", func)?;
+        }
+        write!(f, "}}\n")
+    }
+}
+
 impl Debug for StateList<'_> {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         for item in &self.0 {
@@ -194,7 +207,7 @@ impl Debug for ArgDef<'_> {
 impl Debug for StatementList<'_> {
     fn fmt(&self, fmt: &mut Formatter) -> Result<(), Error> {
         if self.0.is_empty() {
-            return Ok(());
+            return write!(fmt, "{{ \n }}");
         }
         let mut comma_separated = String::from('\n');
 

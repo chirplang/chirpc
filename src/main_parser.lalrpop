@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use crate::ast::{CompilationUnit, TopLevelDef, FunctionDef, ArgDefList, ArgDef, StatementList, Statement, Number, FunctionCall, ArgList, IdentList, TagList, Tag, PropertyList, Ident, Opcode};
+use crate::ast::*;
 use crate::ChipError;
 use lalrpop_util::{ErrorRecovery, ParseError};
 
@@ -12,9 +12,23 @@ extern {
 pub CompilationUnit: CompilationUnit<'input> = <TopLevelDef*> => CompilationUnit(<>);
 
 TopLevelDef: TopLevelDef<'input> = {
-    <FunctionDef> => TopLevelDef::Func(<>),
+    "tag" <ident:Ident> "{" <states:StateList> <fns:FunctionDefList> "}" => TopLevelDef::TagDef(TagDef { ident, states, fns }),
     "export" <Ident> "{" <TagList> "}" => TopLevelDef::Export(<>),
+    <FunctionDef> => TopLevelDef::Func(<>),
 };
+
+StateList: StateList<'input> =
+    <State*> => StateList(<>);
+
+State: State<'input> ={
+    "state" <ident:Ident> ":" <chip_type:Ident> => State { ident, chip_type: Some(chip_type), default: None },
+    "state" <ident:Ident> "=" <default:Expr> => State { ident, chip_type: None, default: Some(default) },
+    "state" <ident:Ident> ":" <chip_type:Ident> "=" <default:Expr>
+        => State { ident, chip_type: Some(chip_type), default: Some(default) }
+}
+
+FunctionDefList: FunctionDefList<'input> =
+    <FunctionDef*> => FunctionDefList(<>);
 
 FunctionDef: FunctionDef<'input> = {
     <ident:Ident> "(" <args:ArgDefList> ")" "{" <block:StatementList> "}"
@@ -66,18 +80,18 @@ pub Statement: Box<Statement<'input>> = {
 Comp: Box<Statement<'input>> = {
     <Comp> <CompOp> <Expr> => Box::new(Statement::Op(<>)),
     <ExprNoParens>,
-    <ident:Ident> "(" <args:ArgList> ")" => Box::new(Statement::FunctionCall(
-        FunctionCall {
-            ident,
-            args
-        }
-    )),
     "if" <Comp> "{" <StatementList> "}" "else" "{" <StatementList> "}"
         => Box::new(Statement::IfElse(<>)),
     "if" <Comp> "{" <StatementList> "}"
         => Box::new(Statement::If(<>)),
     <Block>,
 };
+
+FunctionCall: FunctionCall<'input> =
+    <ident:Ident> "(" <args:ArgList> ")" => FunctionCall {
+        ident,
+        args
+    };
 
 CompOp: Opcode = {
     ">" => Opcode::Gt,
@@ -91,11 +105,13 @@ CompOp: Opcode = {
 Expr: Box<Statement<'input>> = {
     "(" <Tag> ")" => Box::new(Statement::Tag(<>)),
     "(" <Expr> ")",
+    <FunctionCall> => Box::new(Statement::FunctionCall(<>)),
     Expr ExprOp Factor => Box::new(Statement::Op(<>)),
     Factor,
 };
 
 ExprNoParens: Box<Statement<'input>> = {
+    <FunctionCall> => Box::new(Statement::FunctionCall(<>)),
     ExprNoParens ExprOp Factor => Box::new(Statement::Op(<>)),
     Factor,
 }
