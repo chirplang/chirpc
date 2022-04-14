@@ -1,4 +1,15 @@
 use std::fmt::{Debug, Error, Formatter};
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum ChipParseError<'a> {
+    #[error("Tag was closed incorrectly: {0:?} != {1:?}")]
+    TagClosedIncorrectly(Ident<'a>, Ident<'a>),
+    #[error("Integer literal was too large (couldn't fit into i64): {0}")]
+    IntTooLarge(&'a str),
+    #[error("Float literal was too large (couldn't fit into f64): {0}")]
+    FloatTooLarge(&'a str),
+}
 
 pub struct CompilationUnit<'a>(pub Vec<TopLevelDef<'a>>);
 

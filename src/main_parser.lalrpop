@@ -1,12 +1,11 @@
 use std::str::FromStr;
 use crate::ast::*;
-use anyhow::{anyhow, Error};
 use lalrpop_util::{ErrorRecovery, ParseError};
 
-grammar<'err>(errors: &'err mut Vec<ErrorRecovery<usize, Token<'input>, Error>>);
+grammar<'err>(errors: &'err mut Vec<ErrorRecovery<usize, Token<'input>, ChipParseError<'input>>>);
 
 extern {
-    type Error = Error;
+    type Error = ChipParseError<'input>;
 }
 
 pub CompilationUnit: CompilationUnit<'input> = <TopLevelDef*> => CompilationUnit(<>);
@@ -146,32 +145,32 @@ Num: Number = {
     r"(\+|\-)?[0-9]+" =>? i64::from_str(<>)
         .map_err(|_| ParseError::User {
             // FIXME: This might be better with a custom error type?
-            error: anyhow!("Integer literal was too big for an i64: {<>}")
+            error: ChipParseError::IntTooLarge(<>)
         })
         .map(|raw| Number::Int(raw)),
     // Hexadecimal int without unary + or -
     r"0x([0-9a-fA-F])+" =>? i64::from_str_radix(&<>[2..], 16)
         .map_err(|_| ParseError::User {
-            error: anyhow!("Hexadecimal int literal was too big for an i64: {<>}")
+            error: ChipParseError::IntTooLarge(<>)
         })
         .map(|raw| Number::Int(raw)),
     // Hexadecimal int with unary + or -
     r"(\+|\-)0x([0-9a-fA-F])+" =>?i64::from_str_radix(&<>[3..], 16)
         .map_err(|_| ParseError::User {
-            error: anyhow!("Hexadecimal int literal was too big for an i64: {<>}")
+            error: ChipParseError::IntTooLarge(<>)
         })
         .map(|raw| if <>.starts_with('-') { Number::Int(-raw) }
             else { Number::Int(raw) }),
     // Standard float with optional exponent and + or - at the start
     r"(\+|\-)?[0-9]+\.[0-9]+((e|E)[0-9]+)?" =>? f64::from_str(<>)
         .map_err(|_| ParseError::User {
-            error: anyhow!("Float literal was too big for f64: {<>}")
+            error: ChipParseError::FloatTooLarge(<>)
         })
         .map(|raw| Number::Float(raw)),
     // Float with no dot but exponent
     r"(\+|\-)?[0-9]+(e|E)[0-9]+" =>? f64::from_str(<>)
         .map_err(|_| ParseError::User {
-            error: anyhow!("Float literal was too big for f64: {<>}")
+            error: ChipParseError::FloatTooLarge(<>)
         })
         .map(|raw| Number::Float(raw)),
 };
@@ -198,7 +197,7 @@ Tag: Tag<'input> = {
     "</" <right_ident:Ident> ">" =>? {
         if (ident != right_ident) {
             Err(ParseError::User {
-                error: anyhow!("Tag was closed incorrectly, {ident:?} != {right_ident:?}")
+                error: ChipParseError::TagClosedIncorrectly(ident, right_ident)
             })
         } else {
             Ok(Tag {

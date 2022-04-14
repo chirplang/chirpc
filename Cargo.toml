@@ -11,6 +11,7 @@ build = "build.rs"
 lalrpop = "0.19.7"
 
 [dependencies]
+thiserror = "1.0"
 anyhow = "1.0"
 lalrpop-util = { version = "0.19.7", features = ["lexer"]}
 regex = "1"
