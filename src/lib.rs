@@ -2,28 +2,24 @@
 extern crate lalrpop_util;
 lalrpop_mod!(#[allow(clippy::all, warnings)] pub main_parser);
 mod ast;
-pub mod error;
 mod text;
 mod wasm;
 
 use std::{
-    error::Error,
     fs,
     io::{self},
     path::{Path, PathBuf},
     rc::Rc,
 };
 
-use error::ChipError;
-
 /// Compiles every .chip file in the current directory
-pub fn compile_root() -> Result<(), Box<dyn Error>> {
+pub fn compile_root() -> anyhow::Result<()> {
     let path = std::env::current_dir()?;
     compile_folder(&path)
 }
 
 /// Compiles every .chip file in the specified directory
-pub fn compile_folder<P: AsRef<Path>>(path: P) -> Result<(), Box<dyn Error>> {
+pub fn compile_folder<P: AsRef<Path>>(path: P) -> anyhow::Result<()> {
     let chip_files = chip_files(path)?;
     let mut results = vec![];
     // TODO: Multithreading
@@ -39,12 +35,12 @@ pub fn compile_folder<P: AsRef<Path>>(path: P) -> Result<(), Box<dyn Error>> {
     if err_results.is_empty() {
         Ok(())
     } else {
-        Err(Box::new(ChipError::Multiple(err_results)))
+        anyhow::bail!("Multiple errors found: {:?}", err_results);
     }
 }
 
 #[allow(dead_code, unused_variables)]
-fn compile_file(path: PathBuf) -> Result<(), Box<dyn Error>> {
+fn compile_file(path: PathBuf) -> anyhow::Result<()> {
     let rs_file = resolve_rust_file(path.as_path());
     println!("[{:?}] Starting compilation...", path);
 
@@ -63,8 +59,7 @@ fn compile_file(path: PathBuf) -> Result<(), Box<dyn Error>> {
         let ast = main_parser::CompilationUnitParser::new().parse(&mut e, in_file.text());
         match ast {
             Err(err) => {
-                let err = error::format_parse_error(in_file.clone(), err);
-                return Err(Box::new(err));
+                anyhow::bail!("Parse error in {in_file:?}: {err}");
             }
             Ok(ast) => ast,
         }
@@ -83,7 +78,7 @@ fn resolve_rust_file(path: &Path) -> PathBuf {
 }
 
 /// Copied from lalrpop
-fn chip_files<P: AsRef<Path>>(root_dir: P) -> Result<Vec<PathBuf>, Box<dyn Error>> {
+fn chip_files<P: AsRef<Path>>(root_dir: P) -> anyhow::Result<Vec<PathBuf>> {
     let mut result = vec![];
     for entry in fs::read_dir(root_dir)? {
         let entry = entry?;
@@ -118,7 +113,6 @@ fn chip_files<P: AsRef<Path>>(root_dir: P) -> Result<Vec<PathBuf>, Box<dyn Error
 #[cfg(test)]
 mod tests {
     use crate::wasm::{compile_statement_wasm, ChipType, LocalMap, Primitive};
-    use lalrpop_util::lexer::Token;
     use linked_hash_map::LinkedHashMap;
     use std::rc::Rc;
     use std::vec;
@@ -146,15 +140,6 @@ mod tests {
         let mut errors = vec![];
         let expr = main_parser::StatementParser::new().parse(&mut errors, "9223372036854775808");
         assert!(expr.is_err());
-        assert_eq!(
-            format!("{:?}", expr.unwrap_err()),
-            format!(
-                "{:?}",
-                lalrpop_util::ParseError::User::<usize, Token, _> {
-                    error: ChipError::InputTooBig
-                }
-            )
-        );
     }
 
     #[test]
