@@ -7,6 +7,10 @@ use std::rc::Rc;
 use walrus::ir::{BinaryOp, Instr, InstrSeq, Value};
 use walrus::{InstrSeqBuilder, LocalId, ModuleLocals, ModuleTypes, ValType};
 
+use self::error::WasmCodegenError;
+
+mod error;
+
 pub struct LocalMap {
     pub names: HashMap<String, (Option<LocalId>, ChipType)>,
 }
@@ -52,41 +56,49 @@ pub fn compile_statement_wasm<'a>(
     builder: &mut InstrSeqBuilder,
     func_locals: &'a mut LocalMap,
     module_locals: &mut ModuleLocals,
-    statement: &Statement,
-) -> Option<ChipType> {
+    statement: &'a Statement<'a>,
+) -> anyhow::Result<Option<ChipType>> {
     match statement {
         Statement::Number(num) => {
             return match num {
                 Number::Int(int) => {
                     builder.i64_const(*int);
 
-                    Some(ChipType::Primitive(Primitive::I64))
+                    Ok(Some(ChipType::Primitive(Primitive::I64)))
                 }
                 Number::Float(float) => {
                     builder.f64_const(*float);
 
-                    Some(ChipType::Primitive(Primitive::F64))
+                    Ok(Some(ChipType::Primitive(Primitive::F64)))
                 }
             };
         }
         Statement::Op(statement_1, comp, statement_2) => {
-            let type_1 = compile_statement_wasm(builder, func_locals, module_locals, statement_1)
-                .unwrap_or_else(|| panic!("Statement {:?} must have return value", statement_1));
-            let type_2 = compile_statement_wasm(builder, func_locals, module_locals, statement_2)
-                .unwrap_or_else(|| panic!("Statement {:?} must have return value", statement_2));
+            let type_1 = compile_statement_wasm(builder, func_locals, module_locals, statement_1)?
+                .ok_or(WasmCodegenError::MustHaveReturnValue(format!(
+                    "{statement_1:?}"
+                )))?;
+            let type_2 = compile_statement_wasm(builder, func_locals, module_locals, statement_2)?
+                .ok_or(WasmCodegenError::MustHaveReturnValue(format!(
+                    "{statement_2:?}"
+                )))?;
 
             let primitive_1 = match type_1 {
-                ChipType::Struct(_) => panic!("Cannot use struct in operation"),
+                ChipType::Struct(_) => {
+                    Err(WasmCodegenError::NoStructInOp(format!("{statement_1:?}")))?
+                }
                 ChipType::Primitive(prim) => prim,
             };
 
             let primitive_2 = match type_2 {
-                ChipType::Struct(_) => panic!("Cannot use struct in operation"),
+                ChipType::Struct(_) => {
+                    Err(WasmCodegenError::NoStructInOp(format!("{statement_2:?}")))?
+                }
                 ChipType::Primitive(prim) => prim,
             };
 
             if primitive_1 != primitive_2 {
-                panic!("Comparison must have same type of values on both sides");
+                Err(WasmCodegenError::CompNonEqualType(primitive_1, primitive_2))?;
             }
 
             let int_or_float = primitive_1 == Primitive::I64;
@@ -169,7 +181,7 @@ pub fn compile_statement_wasm<'a>(
             };
 
             //Specifically make sure that there is a value here
-            return Some(type_2);
+            return Ok(Some(type_2));
         }
         Statement::FunctionCall(_) => {}
         Statement::If(condition, block) => {
@@ -208,7 +220,7 @@ pub fn compile_statement_wasm<'a>(
         Statement::Assign(ident, assign_statement) => {
             //Push the right hand value onto the stack
             let statement_type =
-                compile_statement_wasm(builder, func_locals, module_locals, &assign_statement)
+                compile_statement_wasm(builder, func_locals, module_locals, &assign_statement)?
                     .expect("Right-hand side of let assignment must have return type");
 
             let left_name: String = ident
@@ -253,12 +265,12 @@ pub fn compile_statement_wasm<'a>(
                 builder.local_get(local.unwrap());
             });
 
-            return Some(local.1.clone());
+            return Ok(Some(local.1.clone()));
         }
         Statement::Let(_) => {}
         Statement::LetAssign(ident, statement) => {
             //Push the right hand value onto the stack
-            let type_ = compile_statement_wasm(builder, func_locals, module_locals, &statement)
+            let type_ = compile_statement_wasm(builder, func_locals, module_locals, &statement)?
                 .expect("Right-hand side of let assignment must have return type");
 
             let primitives = type_.flatten(ident.0);
@@ -280,18 +292,20 @@ pub fn compile_statement_wasm<'a>(
             });
         }
         Statement::Block(statements) => {
-            return statements
-                .0
-                .iter()
-                .map(|statement| {
-                    compile_statement_wasm(builder, func_locals, module_locals, &statement)
-                })
-                .last()
-                .flatten()
+            let mut last = None;
+            for statement in &statements.0 {
+                last = Some(compile_statement_wasm(
+                    builder,
+                    func_locals,
+                    module_locals,
+                    &statement,
+                )?);
+            }
+            return Ok(last.flatten());
         }
         Statement::Error => {}
         Statement::Tag(_) => todo!(),
     }
 
-    None
+    Ok(None)
 }
