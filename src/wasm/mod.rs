@@ -103,30 +103,6 @@ pub fn compile_statement_wasm<'a>(
 
             let int_or_float = primitive_1 == Primitive::I64;
 
-            //TODO: this is horrible
-            // let int_or_float = match &st_1 {
-            //     None => panic!("Operation {:?} must have left hand value", statement_1),
-            //     Some(_type1) => match &st_2 {
-            //         None => panic!("Operation {:?} must have right hand value", statement_2),
-            //         Some(_type2) => match _type1 {
-            //             ChipType::Struct(_) => panic!("Cannot use struct in operation"),
-            //             ChipType::Primitive(prim1) => match _type2 {
-            //                 ChipType::Struct(_) => panic!("Cannot use struct in operation"),
-            //                 ChipType::Primitive(prim2) => {
-            //                     if prim1 == prim2 {
-            //                         match prim1 {
-            //                             Primitive::F64 => false,
-            //                             Primitive::I64 => true,
-            //                         }
-            //                     } else {
-            //                         panic!("Comparison must have same type of values on bot sides");
-            //                     }
-            //                 }
-            //             },
-            //         },
-            //     },
-            // };
-
             match comp {
                 Opcode::Mul => builder.binop(if int_or_float {
                     BinaryOp::I64Mul
